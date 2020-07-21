@@ -151,8 +151,8 @@ def calibrate_angle_offset(hardware_interface):
                     leg_index,
                 )
                 okay = ""
-                prompt = "The leg should be at exactly **"
-                    + ["horizontal", "45 degrees", "45 degrees"][axis]
+                prompt = "The leg should be at exactly **"\
+                    + ["horizontal", "45 degrees", "45 degrees"][axis]\
                     + "**. Are you satisfied? Enter 'yes' or 'no': "
                 while okay not in ["yes", "no"]:
                     okay = str(
