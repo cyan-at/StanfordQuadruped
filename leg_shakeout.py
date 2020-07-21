@@ -13,6 +13,8 @@ import pigpio
 from pupper.HardwareInterface import HardwareInterface
 from pupper.Config import PWMParams, ServoParams
 
+from calibrate_servos import *
+
 import argparse
 
 def main():
@@ -31,7 +33,7 @@ def main():
   args = parser.parse_args()
 
   axis = args.axis
-  leg_index = args.leg_index
+  leg_index = args.leg
 
   hardware_interface = HardwareInterface()
 
