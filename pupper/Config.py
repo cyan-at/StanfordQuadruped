@@ -5,27 +5,43 @@ from enum import Enum
 # TODO: put these somewhere else
 class PWMParams:
     def __init__(self):
-        self.pins = np.array([[2, 14, 18, 23], [3, 15, 27, 24], [4, 17, 22, 25]])
+        # rows = axis
+        # cols = leg
+        # row[0] = abduction
+        # row[1] = innerhip
+        # row[2] = outerhip
+        # col[0] = front-right
+        # col[1] = front-left
+        # col[2] = back-right
+        # col[3] = back-left
+        self.pins = np.array([
+            [2, 14, 18, 23],
+            [3, 15, 27, 24],
+            [4, 17, 22, 25]])
         self.range = 4000
         self.freq = 250
 
-
 class ServoParams:
     def __init__(self):
-        self.neutral_position_pwm = 1500  # Middle position
-        self.micros_per_rad = MICROS_PER_RAD  # Must be calibrated
+        self.neutral_position_pwm = 1500 
+        # Middle position
+        self.micros_per_rad = MICROS_PER_RAD 
+        # Must be calibrated
 
-        # The neutral angle of the joint relative to the modeled zero-angle in degrees, for each joint
+        # The neutral angle of the joint relative
+        # to the modeled zero-angle in degrees
+        # for each joint
         self.neutral_angle_degrees = NEUTRAL_ANGLE_DEGREES
 
-        self.servo_multipliers = np.array(
-            [[1, 1, 1, 1], [-1, 1, -1, 1], [1, -1, 1, -1]]
-        )
+        self.servo_multipliers = np.array([
+            [1, 1, 1, 1],
+            [-1, 1, -1, 1],
+            [1, -1, 1, -1]
+            ])
 
     @property
     def neutral_angles(self):
         return self.neutral_angle_degrees * np.pi / 180.0  # Convert to radians
-
 
 class Configuration:
     def __init__(self):
@@ -69,8 +85,11 @@ class Configuration:
         #################### GAIT #######################
         self.dt = 0.01
         self.num_phases = 4
-        self.contact_phases = np.array(
-            [[1, 1, 1, 0], [1, 0, 1, 1], [1, 0, 1, 1], [1, 1, 1, 0]]
+        self.contact_phases = np.array([
+            [1, 1, 1, 0],
+            [1, 0, 1, 1],
+            [1, 0, 1, 1],
+            [1, 1, 1, 0]]
         )
         self.overlap_time = (
             0.10  # duration of the phase where all four feet are on the ground
@@ -143,7 +162,12 @@ class Configuration:
                     -self.delta_x + self.x_shift,
                     -self.delta_x + self.x_shift,
                 ],
-                [-self.delta_y, self.delta_y, -self.delta_y, self.delta_y],
+                [
+                    -self.delta_y,
+                    self.delta_y,
+                    -self.delta_y,
+                    self.delta_y
+                ],
                 [0, 0, 0, 0],
             ]
         )
@@ -184,14 +208,17 @@ class Configuration:
     @property
     def phase_ticks(self):
         return np.array(
-            [self.overlap_ticks, self.swing_ticks, self.overlap_ticks, self.swing_ticks]
+            [
+                self.overlap_ticks,
+                self.swing_ticks,
+                self.overlap_ticks,
+                self.swing_ticks]
         )
 
     @property
     def phase_length(self):
         return 2 * self.overlap_ticks + 2 * self.swing_ticks
 
-        
 class SimulationConfig:
     def __init__(self):
         self.XML_IN = "pupper.xml"

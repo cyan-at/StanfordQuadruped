@@ -1,20 +1,31 @@
+#!/usr/bin/env python3
+
 import pigpio
 from pupper.HardwareInterface import HardwareInterface
 from pupper.Config import PWMParams, ServoParams
 import numpy as np
 
-
 def get_motor_name(i, j):
-    motor_type = {0: "abduction", 1: "inner", 2: "outer"}  # Top  # Bottom
-    leg_pos = {0: "front-right", 1: "front-left", 2: "back-right", 3: "back-left"}
+    motor_type = {
+        0: "abduction",
+        1: "inner",
+        2: "outer"
+    }  # Top  # Bottom
+    leg_pos = {
+        0: "front-right",
+        1: "front-left",
+        2: "back-right",
+        3: "back-left"
+    }
     final_name = motor_type[i] + " " + leg_pos[j]
     return final_name
 
-
 def get_motor_setpoint(i, j):
-    data = np.array([[0, 0, 0, 0], [45, 45, 45, 45], [45, 45, 45, 45]])
+    data = np.array([
+        [0, 0, 0, 0],
+        [45, 45, 45, 45],
+        [45, 45, 45, 45]])
     return data[i, j]
-
 
 def degrees_to_radians(input_array):
     """Converts degrees to radians.
@@ -31,9 +42,9 @@ def degrees_to_radians(input_array):
     """
     return np.pi / 180.0 * input_array
 
-
 def step_until(hardware_interface, axis, leg, set_point):
-    """Returns the angle offset needed to correct a given link by asking the user for input.
+    """Returns the angle offset needed to
+    correct a given link by asking the user for input.
 
     Returns
     -------
@@ -41,11 +52,13 @@ def step_until(hardware_interface, axis, leg, set_point):
         Angle offset needed to correct the link.
     """
     found_position = False
-    set_names = ["horizontal", "horizontal", "vertical"]
+    set_names = ["horizontal", "45 degrees", "45 degrees"]
     offset = 0
     while not found_position:
         move_input = str(
-            input("Enter 'a' or 'b' to move the link until it is **" + set_names[axis] + "**. Enter 'd' when done. Input: "
+            input("Enter 'a' or 'b' to move the link until it is **"
+                + set_names[axis]
+                + "**. Enter 'd' when done. Input: "
             )
         )
         if move_input == "a":
@@ -68,9 +81,10 @@ def step_until(hardware_interface, axis, leg, set_point):
 
     return offset
 
-
 def calibrate_angle_offset(hardware_interface):
-    """Calibrate the angle offset for the twelve motors on the robot. Note that servo_params is modified in-place.
+    """
+    Calibrate the angle offset for the twelve motors on the robot.
+    Note that servo_params is modified in-place.
     Parameters
     ----------
     servo_params : ServoParams
@@ -82,10 +96,14 @@ def calibrate_angle_offset(hardware_interface):
     """
 
     # Found K value of (11.4)
-    k = float(
-        input("Enter the scaling constant for your servo. This constant is how much you have to increase the pwm pulse width (in microseconds) to rotate the servo output 1 degree. (It is 11.333 for the newer CLS6336 and CLS6327 servos). Input: ")
-    )
-    hardware_interface.servo_params.micros_per_rad = k * 180 / np.pi
+    # k = float(
+    #     input("Enter the scaling constant for your servo. "
+    #         + "This constant is how much you have to increase "
+    #         + "the pwm pulse width (in microseconds) to rotate "
+    #         + "the servo output 1 degree. (It is 11.333 for the "
+    #         + "newer CLS6336 and CLS6327 servos). Input: ")
+    # )
+    # hardware_interface.servo_params.micros_per_rad = k * 180 / np.pi
 
     hardware_interface.servo_params.neutral_angle_degrees = np.zeros((3, 4))
 
@@ -95,7 +113,8 @@ def calibrate_angle_offset(hardware_interface):
             completed = False
             while not completed:
                 motor_name = get_motor_name(axis, leg_index)
-                print("\n\nCalibrating the **" + motor_name + " motor **")
+                print("\n\nCalibrating the **"
+                    + motor_name + " motor **")
                 set_point = get_motor_setpoint(axis, leg_index)
 
                 # Zero out the neutral angle
@@ -114,12 +133,16 @@ def calibrate_angle_offset(hardware_interface):
                 )
                 print("Final offset: ", offset)
 
-                # The upper leg link has a different equation because we're calibrating to make it horizontal, not vertical
+                # The upper leg link has a different equation because
+                # we're calibrating to make it horizontal, not vertical
                 if axis == 1:
-                    hardware_interface.servo_params.neutral_angle_degrees[axis, leg_index] = set_point - offset
+                    hardware_interface.servo_params.neutral_angle_degrees[
+                        axis, leg_index] = set_point - offset
                 else:
-                    hardware_interface.servo_params.neutral_angle_degrees[axis, leg_index] = -(set_point + offset)
-                print("Calibrated neutral angle: ", hardware_interface.servo_params.neutral_angle_degrees[axis, leg_index])
+                    hardware_interface.servo_params.neutral_angle_degrees[
+                        axis, leg_index] = -(set_point + offset)
+                print("Calibrated neutral angle: ",
+                    hardware_interface.servo_params.neutral_angle_degrees[axis, leg_index])
 
                 # Send the servo command using the new beta value and check that it's ok
                 hardware_interface.set_actuator_position(
@@ -128,13 +151,14 @@ def calibrate_angle_offset(hardware_interface):
                     leg_index,
                 )
                 okay = ""
-                prompt = "The leg should be at exactly **" + ["horizontal", "45 degrees", "45 degrees"][axis] + "**. Are you satisfied? Enter 'yes' or 'no': "
+                prompt = "The leg should be at exactly **"
+                    + ["horizontal", "45 degrees", "45 degrees"][axis]
+                    + "**. Are you satisfied? Enter 'yes' or 'no': "
                 while okay not in ["yes", "no"]:
                     okay = str(
                         input(prompt)
                     )
                 completed = okay == "yes"
-
 
 def main():
     """Main program
@@ -145,8 +169,10 @@ def main():
     print("\n\n CALIBRATION COMPLETE!\n")
     print("Calibrated neutral angles:")
     print(hardware_interface.servo_params.neutral_angle_degrees)
-    print("Copy these values into the NEUTRAL_ANGLE_DEGREES matrix defined pupper/HardwareConfig.py")
-    print("Set the MICROS_PER_RAD value in pupper/HardwareConfig.py to whatever you defined in the beginning of this program as well.")
+    print("Copy these values into the NEUTRAL_ANGLE_DEGREES "
+        + "matrix defined pupper/HardwareConfig.py")
+    print("Set the MICROS_PER_RAD value in pupper/HardwareConfig.py "
+        + "to whatever you defined in the beginning of this program as well.")
 
-
-main()
+if __name__ == "__main__":
+    main()
