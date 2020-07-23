@@ -29,9 +29,21 @@ class Controller:
         self.swing_controller = SwingController(self.config)
         self.stance_controller = StanceController(self.config)
 
-        self.hop_transition_mapping = {BehaviorState.REST: BehaviorState.HOP, BehaviorState.HOP: BehaviorState.FINISHHOP, BehaviorState.FINISHHOP: BehaviorState.REST, BehaviorState.TROT: BehaviorState.HOP}
-        self.trot_transition_mapping = {BehaviorState.REST: BehaviorState.TROT, BehaviorState.TROT: BehaviorState.REST, BehaviorState.HOP: BehaviorState.TROT, BehaviorState.FINISHHOP: BehaviorState.TROT}
-        self.activate_transition_mapping = {BehaviorState.DEACTIVATED: BehaviorState.REST, BehaviorState.REST: BehaviorState.DEACTIVATED}
+        self.hop_transition_mapping = {
+            BehaviorState.REST: BehaviorState.HOP,
+            BehaviorState.HOP: BehaviorState.FINISHHOP,
+            BehaviorState.FINISHHOP: BehaviorState.REST,
+            BehaviorState.TROT: BehaviorState.HOP}
+
+        self.trot_transition_mapping = {
+            BehaviorState.REST: BehaviorState.TROT,
+            BehaviorState.TROT: BehaviorState.REST,
+            BehaviorState.HOP: BehaviorState.TROT,
+            BehaviorState.FINISHHOP: BehaviorState.TROT}
+
+        self.activate_transition_mapping = {
+            BehaviorState.DEACTIVATED: BehaviorState.REST,
+            BehaviorState.REST: BehaviorState.DEACTIVATED}
 
 
     def step_gait(self, state, command):
@@ -74,11 +86,17 @@ class Controller:
 
         ########## Update operating state based on command ######
         if command.activate_event:
-            state.behavior_state = self.activate_transition_mapping[state.behavior_state]
+            state.behavior_state = self.activate_transition_mapping[
+                state.behavior_state]
         elif command.trot_event:
-            state.behavior_state = self.trot_transition_mapping[state.behavior_state]
+            state.behavior_state = self.trot_transition_mapping[
+                state.behavior_state]
         elif command.hop_event:
-            state.behavior_state = self.hop_transition_mapping[state.behavior_state]
+            state.behavior_state = self.hop_transition_mapping[
+                state.behavior_state]
+
+        # update cmd_foot_locations
+        cmd_foot_locations = None
 
         if state.behavior_state == BehaviorState.TROT:
             state.foot_locations, contact_modes = self.step_gait(
@@ -103,28 +121,21 @@ class Controller:
             rmat = euler2mat(roll_compensation, pitch_compensation, 0)
 
             rotated_foot_locations = rmat.T @ rotated_foot_locations
-
-            state.joint_angles = self.inverse_kinematics(
-                rotated_foot_locations, self.config
-            )
+            cmd_foot_locations = rotated_foot_locations
 
         elif state.behavior_state == BehaviorState.HOP:
             state.foot_locations = (
                 self.config.default_stance
                 + np.array([0, 0, -0.09])[:, np.newaxis]
             )
-            state.joint_angles = self.inverse_kinematics(
-                state.foot_locations, self.config
-            )
+            cmd_foot_locations = state.foot_locations
 
         elif state.behavior_state == BehaviorState.FINISHHOP:
             state.foot_locations = (
                 self.config.default_stance
                 + np.array([0, 0, -0.22])[:, np.newaxis]
             )
-            state.joint_angles = self.inverse_kinematics(
-                state.foot_locations, self.config
-            )
+            cmd_foot_locations = state.foot_locations
 
         elif state.behavior_state == BehaviorState.REST:
             yaw_proportion = command.yaw_rate / self.config.max_yaw_rate
@@ -151,8 +162,12 @@ class Controller:
                 )
                 @ state.foot_locations
             )
+            cmd_foot_locations = rotated_foot_locations
+
+        # update joint_angles off cmd_foot_locations
+        if cmd_foot_locations is not None:
             state.joint_angles = self.inverse_kinematics(
-                rotated_foot_locations, self.config
+                cmd_foot_locations, self.config
             )
 
         state.ticks += 1
@@ -160,11 +175,11 @@ class Controller:
         state.roll = command.roll
         state.height = command.height
 
-    def set_pose_to_default(self):
+    def set_pose_to_default(self, state):
         state.foot_locations = (
             self.config.default_stance
             + np.array([0, 0, self.config.default_z_ref])[:, np.newaxis]
         )
-        state.joint_angles = controller.inverse_kinematics(
+        state.joint_angles = self.inverse_kinematics(
             state.foot_locations, self.config
         )
