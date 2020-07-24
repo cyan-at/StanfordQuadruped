@@ -495,8 +495,7 @@ class BlackboardQueueCVED(EventDispatch):
       blackboard[self.cv_name].acquire()
       # syntax in while bool expression (cv predicate) is key
       while blackboard[self.hb_key] and (
-        len(blackboard[self.queue_name]) == 0
-        ):
+        len(blackboard[self.queue_name]) == 0):
         blackboard[self.cv_name].wait()
         # Wait until notified or until a timeout occurs.
         # If the calling thread has not acquired the lock
