@@ -107,6 +107,46 @@ class PupperRunEvent(Event):
       raise Exception("expected 1 token")
     return (int(tokens[0]), blackboard), () # tuple
 
+class InputCheckEvent(Event):
+  def __init__(self, event_id, *args, **kwargs):
+    super(InputCheckEvent, self).__init__(
+      event_id, *args, **kwargs)
+
+  def dispatch(self, event_dispatch, *args, **kwargs):
+    super(InputCheckEvent, self).dispatch(
+      event_dispatch, *args, **kwargs)
+
+    command_input = str(input("Enter command"))
+
+    event_dispatch.blackboard["pupper_command"]
+
+  def finish(self, event_dispatch, *args, **kwargs):
+    # ############### option A:
+    # spawn the next event as an explicit
+    # **child** thread
+    # constructor_args = (self.event_id,
+    #   event_dispatch.blackboard)
+    # event_dispatch.dispatch(
+    #   blackboard["ControllerCheckEvent"](
+    #     *constructor_args), ())
+
+    # ############### option B:
+    # spawn the next event through the queue
+    # and the ED, aka, a **sibling** thread
+
+    event_dispatch.blackboard["input_cv"].acquire()
+    event_dispatch.blackboard["input_queue"].append(
+      ["InputCheckEvent", self.event_id])
+    event_dispatch.blackboard["input_cv"].notify(1)
+    event_dispatch.blackboard["input_cv"].release()
+
+  @staticmethod
+  def deserialize(blackboard, *args, **kwargs):
+    tokens = args[0] # args is a tuple of 1 list, that list is tokens
+    if len(tokens) != 1:
+      raise Exception("expected 1 token")
+    return (int(tokens[0]), blackboard), () # tuple
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   # parser.add_argument(
@@ -166,7 +206,7 @@ if __name__ == "__main__":
 
   ############### events
   blackboard["PupperRunEvent"] = PupperRunEvent
-  # blackboard["InputCheckEvent"] = InputCheckEvent
+  blackboard["InputCheckEvent"] = InputCheckEvent
 
   ############### process init
   blackboard["pupper_cv"].acquire()
