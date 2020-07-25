@@ -238,6 +238,21 @@ if __name__ == "__main__":
   blackboard["gamepad_thread"].start()
   # blackboard["pupper_thread"].start()
 
+  # really it is wait on a Condition that
+  # all consumers notify
+  # but predicate on all queues being empty
+  blackboard["done"].acquire()
+  while nonempty_queue_exists(blackboard,
+    [
+      # queue names that are admissible
+      # if they are nonempty
+    ],
+    # verbose = True
+    ):
+    # ) or not blackboard["atomic_bool"]:
+    blackboard["done"].wait()
+  blackboard["done"].release()
+
   ### Shutdown procedure
   print("### SHUT DOWN ###")
 
