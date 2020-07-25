@@ -25,7 +25,7 @@ class JoystickInterface:
             self.udp_publisher = UDPComms.Publisher(
                 udp_publisher_port)
 
-    def build_command(self, msg):
+    def build_command(self, state, msg):
         command = Command()
 
         ####### Handle discrete commands ########
@@ -94,7 +94,7 @@ class JoystickInterface:
             '''
             msg = self.udp_handle.get()
             
-            command = self.build_command(msg)
+            command = self.build_command(state, msg)
 
             return command
 
