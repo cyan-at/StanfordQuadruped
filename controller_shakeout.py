@@ -100,15 +100,15 @@ class CommandGamepad(Gamepad):
       self.external_blackboard["pupper"].state,
       self._msg)
 
-    event_dispatch.blackboard[self._cmd_target_name + "_cv"].acquire()
-    event_dispatch.blackboard[self._cmd_target_name + "_queue"].append(
+    self.external_blackboard[self._cmd_target_name + "_cv"].acquire()
+    self.external_blackboard[self._cmd_target_name + "_queue"].append(
       [
         "CmdSetEvent",
         1,
         self._cmd_target_name,
         self._cmd_target_name])
-    event_dispatch.blackboard[self._cmd_target_name + "_cv"].notify(1)
-    event_dispatch.blackboard[self._cmd_target_name + "_cv"].release()
+    self.external_blackboard[self._cmd_target_name + "_cv"].notify(1)
+    self.external_blackboard[self._cmd_target_name + "_cv"].release()
 
 class Pupper(IterableObject):
   def __init__(self):
