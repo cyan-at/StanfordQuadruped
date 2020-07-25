@@ -257,6 +257,7 @@ if __name__ == "__main__":
     [
       # queue names that are admissible
       # if they are nonempty
+      "gamepad_queue",
       "pupper_queue"
     ],
     # verbose = True
