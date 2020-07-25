@@ -1,4 +1,3 @@
-import UDPComms
 import numpy as np
 import time
 from src.State import BehaviorState, State
@@ -20,6 +19,7 @@ class JoystickInterface:
         self.message_rate = 50
 
         if udp_port is not None:
+            import UDPComms
             self.udp_handle = UDPComms.Subscriber(
                 udp_port, timeout=0.3)
             self.udp_publisher = UDPComms.Publisher(
