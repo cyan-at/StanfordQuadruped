@@ -73,7 +73,7 @@ class CommandGamepad(Gamepad):
     if type(args[1]) is not str:
       raise Exception("CommandGamepad expects dict, str")
 
-    self.external_blackboard = external_blackboard
+    self.external_blackboard = args[0]
 
     self._cmd_target_name = args[1]
 
