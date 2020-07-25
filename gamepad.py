@@ -183,7 +183,11 @@ class Gamepad(IterableObject):
       self.external_blackboard["gamepad_buffer"])
 
   def do_iterate(self, *args, **kwargs):
-    evbuf = self.js_object.read(8)
+    try:
+      evbuf = self.js_object.read(8)
+    except Exception as e:
+      return
+
     # this blocks, which is a good / bad thing
     # good in that in prevents error case 2
     # bad in that it causes error case 1
