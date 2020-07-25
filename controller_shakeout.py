@@ -100,7 +100,7 @@ class CommandGamepad(Gamepad):
       self.external_blackboard["pupper"].state,
       self._msg)
 
-    print("made command!", k, v)
+    print("made command!", cmd)
 
     self.external_blackboard[self._cmd_target_name + "_cv"].acquire()
     self.external_blackboard[self._cmd_target_name + "_queue"].append(
