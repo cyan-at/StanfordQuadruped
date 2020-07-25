@@ -182,6 +182,26 @@ class Gamepad(IterableObject):
     print("gamepad_buffer",
       self.external_blackboard["gamepad_buffer"])
 
+  def teardown(self, blackboard):
+    # for child classes to override
+
+    blackboard["done"].acquire()
+    blackboard["done_queue"].clear()
+    blackboard["done"].notify_all()
+    blackboard["done"].release()
+
+    # this will not avoid the race condition
+    # where an Event id dispatch'd
+    # before / while shutdown happens
+    # so there will be 1 hanging thread
+    # that keeps program alive
+    # this is why Events need to be
+    # as small in scope as possible / cooperative
+
+    # in this case, close'ing the underlying blocking
+    # process will force that event to end
+    blackboard["gamepad"].js_object.close()
+
   def do_iterate(self, *args, **kwargs):
     evbuf = self.js_object.read(8)
 
@@ -206,6 +226,7 @@ class Gamepad(IterableObject):
       # print("%s, %d" % (btn_name, v))
 
       if btn_name == "mode" and v == 0:
+        '''
         # print("poking done")
         args[0].blackboard["done"].acquire()
         args[0].blackboard["done_queue"].clear()
@@ -230,6 +251,9 @@ class Gamepad(IterableObject):
         # or maybe this is reasonable
         # because this shared resource is used in another 
         # EventThread, #notsure
+        '''
+
+        self.teardown(blackboard)
         return
 
       self.produce(btn_name, v)

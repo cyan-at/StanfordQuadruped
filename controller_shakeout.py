@@ -112,6 +112,14 @@ class CommandGamepad(Gamepad):
     self.external_blackboard[self._cmd_target_name + "_cv"].notify(1)
     self.external_blackboard[self._cmd_target_name + "_cv"].release()
 
+  def teardown(self, blackboard);
+    blackboard[self._cmd_target_name + "_cv"].acquire()
+    blackboard[self._cmd_target_name + "_queue"].clear()
+    blackboard[self._cmd_target_name + "_cv"].notify_all()
+    blackboard[self._cmd_target_name + "_cv"].release()
+
+    super(CommandGamepad, self).teardown(blackboard)
+
 class Pupper(IterableObject):
   def __init__(self):
     super(Pupper, self).__init__()
