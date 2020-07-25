@@ -112,7 +112,7 @@ class CommandGamepad(Gamepad):
     self.external_blackboard[self._cmd_target_name + "_cv"].notify(1)
     self.external_blackboard[self._cmd_target_name + "_cv"].release()
 
-  def teardown(self, blackboard);
+  def teardown(self, blackboard):
     blackboard[self._cmd_target_name + "_cv"].acquire()
     blackboard[self._cmd_target_name + "_queue"].clear()
     blackboard[self._cmd_target_name + "_cv"].notify_all()
