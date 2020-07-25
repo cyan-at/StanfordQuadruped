@@ -96,7 +96,7 @@ class CommandGamepad(Gamepad):
     # produce a command to cmd_target
 
     self._msg[k] = v
-    cmd = self.joystickinterface.build_command(
+    cmd = self.joystick_interface.build_command(
       self._msg)
 
     event_dispatch.blackboard[self._cmd_target_name + "_cv"].acquire()
