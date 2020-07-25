@@ -291,6 +291,57 @@ class RetryableEvent(TryFailEvent):
     print("RetryableEvent::catch_exception giving up event's lock")
     self.event_dispatch.mutex_registry[self.get_id()].release()
 
+# some handy events commonly used
+class IterateEvent(Event):
+  def __init__(self, event_id, *args, **kwargs):
+    super(IterateEvent, self).__init__(
+      event_id, *args, **kwargs)
+
+  def dispatch(self, event_dispatch, *args, **kwargs):
+    super(IterateEvent, self).dispatch(
+      event_dispatch, *args, **kwargs)
+
+    # print("dispatching")
+    iterable_object_key = args[0]
+    event_dispatch.blackboard[
+      iterable_object_key].iterate(event_dispatch)
+    # time.sleep(0.05)
+    # print("dispatch ending")
+
+  def finish(self, event_dispatch, *args, **kwargs):
+    # ############### option A:
+    # spawn the next event as an explicit
+    # **child** thread
+    # constructor_args = (self.event_id,
+    #   event_dispatch.blackboard)
+    # event_dispatch.dispatch(
+    #   blackboard["IterateEvent"](
+    #     *constructor_args), ())
+
+    # ############### option B:
+    # spawn the next event through the queue
+    # and the ED, aka, a **sibling** thread
+
+    iterable_object_key = args[0]
+    ed_prefix = args[1]
+
+    event_dispatch.blackboard[ed_prefix + "_cv"].acquire()
+    event_dispatch.blackboard[ed_prefix + "_queue"].append(
+      [
+        "IterateEvent",
+        self.event_id,
+        iterable_object_key,
+        ed_prefix])
+    event_dispatch.blackboard[ed_prefix + "_cv"].notify(1)
+    event_dispatch.blackboard[ed_prefix + "_cv"].release()
+
+  @staticmethod
+  def deserialize(blackboard, *args, **kwargs):
+    tokens = args[0] # args is a tuple of 1 list, that list is tokens
+    if len(tokens) != 3:
+      raise Exception("expected 3 tokens")
+    return (int(tokens[0]), blackboard), (tokens[1], tokens[2]) # tuple
+
 # JQ3uqm
 # An undefined activation, fire-immediately dispatch
 # ################## other ways of activation:
@@ -312,6 +363,9 @@ class RetryableEvent(TryFailEvent):
 # to the 'ingestion' point of a discrete time system
 # IterableObjects tree root (temporal outer rim)
 # EventDispatch nodes (any as long as it consumes)
+# ################## insight
+# EventDispatches are enzymes, they reduce activation energy
+# of imperatives into inevitabilities
 class EventDispatch(object):
   def __init__(self, blackboard = None, ed_id = None):
     self.thread_registry = {}
