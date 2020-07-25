@@ -12,19 +12,19 @@ class Gamepad(IterableObject):
 
     self._blackboard["axis_names"] = {
       # These constants were borrowed from linux/input.h
-      0x00 : 'x',
-      0x01 : 'y',
-      0x02 : 'z',
-      0x03 : 'rx',
-      0x04 : 'ry',
+      0x00 : 'lx', # modified to match PSJoystick
+      0x01 : 'ly', # modified to match PSJoystick
+      0x02 : 'lz',
+      0x03 : 'rx', # modified to match PSJoystick
+      0x04 : 'ry', # modified to match PSJoystick
       0x05 : 'rz',
       0x06 : 'trottle',
       0x07 : 'rudder',
       0x08 : 'wheel',
       0x09 : 'gas',
       0x0a : 'brake',
-      0x10 : 'hat0x',
-      0x11 : 'hat0y',
+      0x10 : 'dpadx', # modified to match PSJoystick
+      0x11 : 'dpady', # modified to match PSJoystick
       0x12 : 'hat1x',
       0x13 : 'hat1y',
       0x14 : 'hat2x',
@@ -62,8 +62,8 @@ class Gamepad(IterableObject):
       0x133 : 'x',
       0x134 : 'y',
       0x135 : 'z',
-      0x136 : 'tl',
-      0x137 : 'tr',
+      0x136 : 'L1', # modified to match PSJoystick
+      0x137 : 'R1', # modified to match PSJoystick
       0x138 : 'tl2',
       0x139 : 'tr2',
       0x13a : 'select',
@@ -89,7 +89,7 @@ class Gamepad(IterableObject):
     self._js_object = None # skip lock protection / overhead for now
     self._blackboard["js_name"] = ""
 
-    self._buffer_blackboard = None
+    self.external_blackboard = None
 
   def do_init(self, *args, **kwargs):
     tries = 0
@@ -158,12 +158,29 @@ class Gamepad(IterableObject):
     # self._blackboard["js_object"] = js_object
     self.js_object = js_object
 
-    # expect the buffer_blackboard to be
-    # passed in by args[0]
-    self._buffer_blackboard = args[0]
-    if type(self._buffer_blackboard) is not dict:
-      raise Exception("no buffer on buffer_blackboard!")
-    self._buffer_blackboard["gamepad_buffer"] = ""
+    self.external_blackboard = None
+    self.init_external_blackboard(*args)
+
+  def init_external_blackboard(self, *args):
+    # for child classes to override
+
+    # base class
+    # expect args[0] to be dict
+    # exposes 1 str
+    # and sets member var
+    if type(args[0]) is not dict:
+      raise Exception("external_blackboard not dict")
+    self.external_blackboard = external_blackboard
+    self.external_blackboard["gamepad_buffer"] = ""
+
+  def produce_to_buffer(self, k, v):
+    # for child classes to override
+
+    # base class is pass-through to buffer
+    self.external_blackboard["gamepad_buffer"] =\
+      k + "," + str(v) + "\n"
+    print("gamepad_buffer",
+      self.external_blackboard["gamepad_buffer"])
 
   def do_iterate(self, *args, **kwargs):
     evbuf = self.js_object.read(8)
@@ -186,12 +203,6 @@ class Gamepad(IterableObject):
 
       self._blackboard["button_states"][btn_name] = v
       # print("%s, %d" % (btn_name, v))
-
-      # dispatch an event
-      # SerialEvent(BTN, btn_name, v)
-      # print(
-      #   "dispatching SerialEvent of BTN, %s, %d" % (
-      #   btn_name, v))
 
       if btn_name == "mode" and v == 0:
         # print("poking done")
@@ -220,12 +231,7 @@ class Gamepad(IterableObject):
         # EventThread, #notsure
         return
 
-      # production of something for something else
-      self._buffer_blackboard["gamepad_buffer"] =\
-        btn_name + "," + str(v) + "\n"
-
-      print("gamepad_buffer",
-          self._buffer_blackboard["gamepad_buffer"])
+      self.produce_to_buffer(btn, v)
 
     elif ty & 0x02: # axis
       if n < 0 or n >= len(self._blackboard["axis_map"]):
@@ -237,15 +243,7 @@ class Gamepad(IterableObject):
       # print("%s: %.3f" % (axis, fvalue))
 
       # x / y joystick signals are very noisy
-      # print(
-      #   "dispatching SerialEvent of AXIS, %s, %.3f" % (
-      #   axis, fvalue))
-      # production of something for something else
-      self._buffer_blackboard["gamepad_buffer"] =\
-        axis + "," + str(round(fvalue, 3)) + "\n"
-
-      print("gamepad_buffer",
-        self._buffer_blackboard["gamepad_buffer"])
+      self.produce_to_buffer(axis, round(fvalue, 3))
 
   def do_cleanup(self):
     self.js_object.close()

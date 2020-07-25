@@ -364,8 +364,12 @@ class IterateEvent(Event):
 # IterableObjects tree root (temporal outer rim)
 # EventDispatch nodes (any as long as it consumes)
 # ################## insight
-# EventDispatches are enzymes, they reduce activation energy
-# of imperatives into inevitabilities
+# EventDispatches are enzymes
+# they *reduce* activation energy
+# make imperatives (Events) inevitable
+# ################## insight
+# EventDispatches manifest the
+# matrix perspective of *currency*
 class EventDispatch(object):
   def __init__(self, blackboard = None, ed_id = None):
     self.thread_registry = {}
