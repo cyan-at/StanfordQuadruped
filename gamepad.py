@@ -224,6 +224,9 @@ class Gamepad(IterableObject):
       self._buffer_blackboard["gamepad_buffer"] =\
         btn_name + "," + str(v) + "\n"
 
+      print("gamepad_buffer",
+          self._buffer_blackboard["gamepad_buffer"])
+
     elif ty & 0x02: # axis
       if n < 0 or n >= len(self._blackboard["axis_map"]):
         return
@@ -241,8 +244,8 @@ class Gamepad(IterableObject):
       self._buffer_blackboard["gamepad_buffer"] =\
         axis + "," + str(round(fvalue, 3)) + "\n"
 
-    print("gamepad_buffer",
-      self._buffer_blackboard["gamepad_buffer"])
+      print("gamepad_buffer",
+        self._buffer_blackboard["gamepad_buffer"])
 
   def do_cleanup(self):
     self.js_object.close()
