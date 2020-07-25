@@ -297,16 +297,20 @@ class IterateEvent(Event):
     super(IterateEvent, self).__init__(
       event_id, *args, **kwargs)
 
+    self._exception = False
+
   def dispatch(self, event_dispatch, *args, **kwargs):
     super(IterateEvent, self).dispatch(
       event_dispatch, *args, **kwargs)
 
     # print("dispatching")
     iterable_object_key = args[0]
-    event_dispatch.blackboard[
-      iterable_object_key].iterate(event_dispatch)
-    # time.sleep(0.05)
-    # print("dispatch ending")
+
+    try:
+      event_dispatch.blackboard[
+        iterable_object_key].iterate(event_dispatch)
+    except:
+      self._exception = True
 
   def finish(self, event_dispatch, *args, **kwargs):
     # ############### option A:
@@ -321,6 +325,9 @@ class IterateEvent(Event):
     # ############### option B:
     # spawn the next event through the queue
     # and the ED, aka, a **sibling** thread
+
+    if self._exception:
+      return
 
     iterable_object_key = args[0]
     ed_prefix = args[1]
