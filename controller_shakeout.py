@@ -108,7 +108,8 @@ class CommandGamepad(Gamepad):
         "CmdSetEvent",
         1,
         self._cmd_target_name,
-        self._cmd_target_name])
+        self._cmd_target_name,
+        cmd])
     self.external_blackboard[self._cmd_target_name + "_cv"].notify(1)
     self.external_blackboard[self._cmd_target_name + "_cv"].release()
 
@@ -166,9 +167,9 @@ class CmdSetEvent(IterateEvent):
   @staticmethod
   def deserialize(blackboard, *args, **kwargs):
     tokens = args[0] # args is a tuple of 1 list, that list is tokens
-    if len(tokens) != 1:
-      raise Exception("expected 1 token")
-    return (int(tokens[0]), blackboard), () # tuple
+    if len(tokens) != 4:
+      raise Exception("expected 4 token")
+    return (int(tokens[0]), blackboard), (tokens[1], tokens[2], tokens[3]) # tuple
 
 if __name__ == "__main__":
   from common import bcolors, nonempty_queue_exists
