@@ -170,7 +170,7 @@ class Gamepad(IterableObject):
     # and sets member var
     if type(args[0]) is not dict:
       raise Exception("external_blackboard not dict")
-    self.external_blackboard = external_blackboard
+    self.external_blackboard = args[0]
     self.external_blackboard["gamepad_buffer"] = ""
 
   def produce(self, k, v):
