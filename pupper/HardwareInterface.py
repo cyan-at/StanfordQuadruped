@@ -105,24 +105,29 @@ def deactivate_servos(pi, pwm_params):
                 0)
 
 class HardwareInterface:
-    def __init__(self):
-        self.pi = pigpio.pi()
-        self.pwm_params = PWMParams()
-        self.servo_params = ServoParams()
-        initialize_pwm(self.pi, self.pwm_params)
+    def __init__(self, simulate = False):
+        self._simulate = simulate
+
+        if not self._simulate:
+            self.pi = pigpio.pi()
+            self.pwm_params = PWMParams()
+            self.servo_params = ServoParams()
+            initialize_pwm(self.pi, self.pwm_params)
 
     def set_actuator_postions(self, joint_angles):
-        send_servo_commands(
-            self.pi,
-            self.pwm_params,
-            self.servo_params,
-            joint_angles)
+        if not self._simulate:
+            send_servo_commands(
+                self.pi,
+                self.pwm_params,
+                self.servo_params,
+                joint_angles)
     
     def set_actuator_position(self, joint_angle, axis, leg):
-        send_servo_command(
-            self.pi,
-            self.pwm_params,
-            self.servo_params,
-            joint_angle,
-            axis,
-            leg)
+        if not self._simulate:
+            send_servo_command(
+                self.pi,
+                self.pwm_params,
+                self.servo_params,
+                joint_angle,
+                axis,
+                leg)
