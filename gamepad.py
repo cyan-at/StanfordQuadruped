@@ -231,7 +231,7 @@ class Gamepad(IterableObject):
         # EventThread, #notsure
         return
 
-      self.produce(btn, v)
+      self.produce(btn_name, v)
 
     elif ty & 0x02: # axis
       if n < 0 or n >= len(self._blackboard["axis_map"]):
