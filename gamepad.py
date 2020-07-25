@@ -173,7 +173,7 @@ class Gamepad(IterableObject):
     self.external_blackboard = external_blackboard
     self.external_blackboard["gamepad_buffer"] = ""
 
-  def produce_to_buffer(self, k, v):
+  def produce(self, k, v):
     # for child classes to override
 
     # base class is pass-through to buffer
@@ -231,7 +231,7 @@ class Gamepad(IterableObject):
         # EventThread, #notsure
         return
 
-      self.produce_to_buffer(btn, v)
+      self.produce(btn, v)
 
     elif ty & 0x02: # axis
       if n < 0 or n >= len(self._blackboard["axis_map"]):
@@ -243,7 +243,7 @@ class Gamepad(IterableObject):
       # print("%s: %.3f" % (axis, fvalue))
 
       # x / y joystick signals are very noisy
-      self.produce_to_buffer(axis, round(fvalue, 3))
+      self.produce(axis, round(fvalue, 3))
 
   def do_cleanup(self):
     self.js_object.close()
