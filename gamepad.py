@@ -253,7 +253,7 @@ class Gamepad(IterableObject):
         # EventThread, #notsure
         '''
 
-        self.teardown(blackboard)
+        self.teardown(args[0].blackboard)
         return
 
       self.produce(btn_name, v)
