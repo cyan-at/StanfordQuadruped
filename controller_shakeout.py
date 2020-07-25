@@ -152,6 +152,9 @@ class Pupper(IterableObject):
       self.state,
       self._cmd)
 
+    self.hardware_interface.set_actuator_postions(
+      self.state.joint_angles)
+
   def do_cleanup(self):
     pass
 
