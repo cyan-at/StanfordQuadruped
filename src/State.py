@@ -18,6 +18,7 @@ class State:
 
         self.behavior_state = BehaviorState.REST
 
+        self.quat_orientation = np.array([1, 0, 0, 0])
 
 class BehaviorState(Enum):
     DEACTIVATED = -1
