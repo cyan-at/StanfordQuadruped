@@ -26,6 +26,8 @@ from gamepad import *
 from src.Command import Command
 from src.JoystickInterface import JoystickInterface
 
+from common import IterateEvent
+
 class CommandGamepad(Gamepad):
   def __init__(self):
     config = Configuration()
