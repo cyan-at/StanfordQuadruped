@@ -247,7 +247,7 @@ if __name__ == "__main__":
 
   ############### process lifecycle
   blackboard["gamepad_thread"].start()
-  # blackboard["pupper_thread"].start()
+  blackboard["pupper_thread"].start()
 
   # really it is wait on a Condition that
   # all consumers notify
