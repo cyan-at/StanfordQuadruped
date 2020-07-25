@@ -218,15 +218,15 @@ if __name__ == "__main__":
       None,
       bcolors.CYAN))
 
-  # pupper_ed = BlackboardQueueCVED(
-  #   blackboard, "pupper")
-  # blackboard["pupper_thread"] = Thread(
-  #   target=pupper_ed.run,
-  #   args=(blackboard,
-  #     "pupper",
-  #     # "done",
-  #     None,
-  #     bcolors.GREEN))
+  pupper_ed = BlackboardQueueCVED(
+    blackboard, "pupper")
+  blackboard["pupper_thread"] = Thread(
+    target=pupper_ed.run,
+    args=(blackboard,
+      "pupper",
+      # "done",
+      None,
+      bcolors.GREEN))
 
   ############### events
   blackboard["IterateEvent"] = IterateEvent
@@ -239,11 +239,11 @@ if __name__ == "__main__":
   blackboard["gamepad_cv"].notify(1)
   blackboard["gamepad_cv"].release()
 
-  # blackboard["pupper_cv"].acquire()
-  # blackboard["pupper_queue"].append(
-  #   ["IterateEvent", 1, "pupper", "pupper"])
-  # blackboard["pupper_cv"].notify(1)
-  # blackboard["pupper_cv"].release()
+  blackboard["pupper_cv"].acquire()
+  blackboard["pupper_queue"].append(
+    ["IterateEvent", 1, "pupper", "pupper"])
+  blackboard["pupper_cv"].notify(1)
+  blackboard["pupper_cv"].release()
 
   ############### process lifecycle
   blackboard["gamepad_thread"].start()
@@ -260,7 +260,7 @@ if __name__ == "__main__":
       "gamepad_queue",
       "pupper_queue"
     ],
-    # verbose = True
+    verbose = True
     ):
     # ) or not blackboard["atomic_bool"]:
     blackboard["done"].wait()
