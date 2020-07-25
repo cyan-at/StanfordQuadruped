@@ -509,6 +509,8 @@ class ROS1EventDispatch(EventDispatch):
 # whereas timer based activation is uniform in time
 # this type of activation
 # no busy-wait & non-uniform time spacing
+# ################## type
+# this is a SINGLE queue ED, not a compound queue
 class BlackboardQueueCVED(EventDispatch):
   def __init__(self, blackboard, name):
     super(BlackboardQueueCVED, self).__init__(
@@ -598,12 +600,13 @@ class BlackboardQueueCVED(EventDispatch):
       ########################################################
 
       # ED tries to 'cleanup'
-      if len(blackboard[self.queue_name]) == 0 and\
-        empty_cv_name in blackboard:
-        self.log("notifying " + empty_cv_name)
-        blackboard[empty_cv_name].acquire()
-        blackboard[empty_cv_name].notify_all()
-        blackboard[empty_cv_name].release()
+      if empty_cv_name is not None:
+        if len(blackboard[self.queue_name]) == 0 and\
+          empty_cv_name in blackboard:
+          self.log("notifying " + empty_cv_name)
+          blackboard[empty_cv_name].acquire()
+          blackboard[empty_cv_name].notify_all()
+          blackboard[empty_cv_name].release()
 
     self.log(self.name + " shutdown")
 
