@@ -236,7 +236,7 @@ if __name__ == "__main__":
     sys.exit(1)
   blackboard["gamepad"] = gamepad
 
-  pupper = Pupper(True)
+  pupper = Pupper(False)
   pupper.init(blackboard)
   if not pupper.initialized():
     print("couldn't initialize pupper")
