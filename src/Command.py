@@ -15,7 +15,7 @@ class Command(object):
         
         self.hop_event = False
         self.trot_event = False
-        self.activate_event = False
+        self.activate_event = 0
 
     def __str__(self):
         s = "-------------------\n"

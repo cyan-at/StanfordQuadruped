@@ -28,6 +28,64 @@ from src.JoystickInterface import JoystickInterface
 
 from common import IterateEvent
 
+class Pupper(IterableObject):
+  def __init__(self, simulate = False):
+    super(Pupper, self).__init__()
+
+    self._blackboard = None
+
+    self.config = Configuration()
+
+    self.hardware_interface = HardwareInterface(simulate)
+
+    self.controller = Controller(
+        self.config,
+        four_legs_inverse_kinematics,
+    )
+    self.state = State()
+
+    self.activated = False
+
+    self._cmd = Command()
+
+    self._last_t = time.time()
+
+  def do_init(self, *args, **kwargs):
+    self.controller.set_pose_to_default(self.state)
+    self.hardware_interface.set_actuator_postions(
+      self.state.joint_angles)
+
+    if type(args[0]) is not dict:
+      raise Exception(
+        "expected init with blackboard")
+    self._blackboard = args[0]
+
+  def do_iterate(self, *args, **kwargs):
+    if self._cmd.activate_event == 1:
+      self.activated = not self.activated
+      # unset it immediately, do not wait for gamepad
+      self._cmd.activate_event = 0
+
+    if self.activated:
+      now = time.time()
+      if now - self._last_t < self.config.dt:
+        # print("too soon", now - self._last_t)
+        time.sleep(self.config.dt)
+        return
+
+      self.controller.run(
+        self.state,
+        self._cmd)
+      self.hardware_interface.set_actuator_postions(
+        self.state.joint_angles)
+
+      self._last_t = time.time()
+
+    time.sleep(self.config.dt)
+
+  def do_cleanup(self):
+    pass
+
 class CommandGamepad(Gamepad):
   def __init__(self):
     config = Configuration()
@@ -93,13 +151,16 @@ class CommandGamepad(Gamepad):
       self.external_blackboard[queue_name] = []
 
   def produce(self, k, v):
-    # produce a command to cmd_target
+    # produce a command to cmd_target if it's something
+    # pupper cares about
+    if (k not in self._msg):
+      return
 
     self._msg[k] = v
+
     cmd = self.joystick_interface.build_command(
       self.external_blackboard["pupper"].state,
       self._msg)
-
     print("made command!", cmd)
 
     self.external_blackboard[self._cmd_target_name + "_cv"].acquire()
@@ -121,46 +182,10 @@ class CommandGamepad(Gamepad):
 
     super(CommandGamepad, self).teardown(blackboard)
 
-class Pupper(IterableObject):
-  def __init__(self):
-    super(Pupper, self).__init__()
-
-    self.config = Configuration()
-    self.hardware_interface = HardwareInterface()
-    self.controller = Controller(
-        self.config,
-        four_legs_inverse_kinematics,
-    )
-    self.state = State()
-
-    self._blackboard = None
-
-    self._cmd = Command()
-
-  def do_init(self, *args, **kwargs):
-    self.controller.set_pose_to_default(self.state)
-    self.hardware_interface.set_actuator_postions(
-      self.state.joint_angles)
-
-    if type(args[0]) is not dict:
-      raise Exception(
-        "expected init with blackboard")
-    self._blackboard = args[0]
-
-  def do_iterate(self, *args, **kwargs):
-    self.controller.run(
-      self.state,
-      self._cmd)
-
-    self.hardware_interface.set_actuator_postions(
-      self.state.joint_angles)
-
-  def do_cleanup(self):
-    pass
-
 class CmdSetEvent(IterateEvent):
   def dispatch(self, event_dispatch, *args, **kwargs):
     # set the pupper's cmd
+    print("updating pupper cmd")
     event_dispatch.blackboard[
       "pupper"]._cmd = args[2]
 
@@ -204,7 +229,7 @@ if __name__ == "__main__":
     sys.exit(1)
   blackboard["gamepad"] = gamepad
 
-  pupper = Pupper()
+  pupper = Pupper(True)
   pupper.init(blackboard)
   if not pupper.initialized():
     print("couldn't initialize pupper")
