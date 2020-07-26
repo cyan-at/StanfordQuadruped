@@ -162,6 +162,7 @@ class CommandGamepad(Gamepad):
     cmd = self.joystick_interface.build_command(
       self.external_blackboard["pupper"].state,
       self._msg)
+    print("cmd", cmd)
 
     self.external_blackboard[self._cmd_target_name + "_cv"].acquire()
     self.external_blackboard[self._cmd_target_name + "_queue"].append(
@@ -185,7 +186,7 @@ class CommandGamepad(Gamepad):
 class CmdSetEvent(IterateEvent):
   def dispatch(self, event_dispatch, *args, **kwargs):
     # set the pupper's cmd
-    print("updating pupper cmd")
+    # print("updating pupper cmd")
     event_dispatch.blackboard[
       "pupper"]._cmd = args[2]
 
