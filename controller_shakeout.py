@@ -161,7 +161,6 @@ class CommandGamepad(Gamepad):
     cmd = self.joystick_interface.build_command(
       self.external_blackboard["pupper"].state,
       self._msg)
-    print("made command!", cmd)
 
     self.external_blackboard[self._cmd_target_name + "_cv"].acquire()
     self.external_blackboard[self._cmd_target_name + "_queue"].append(
@@ -191,6 +190,14 @@ class CmdSetEvent(IterateEvent):
 
     super(CmdSetEvent, self).dispatch(
       event_dispatch, *args, **kwargs)
+
+  def finish(self, event_dispatch, *args, **kwargs):
+    # do not self-produce
+    # assume there will be another PupperEvent
+    # to drive the next iterate
+    if self._exception:
+      print("exception caught")
+      return
 
   @staticmethod
   def deserialize(blackboard, *args, **kwargs):
