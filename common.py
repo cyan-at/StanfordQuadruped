@@ -9,6 +9,8 @@ import time
 from threading import Thread, Lock, Condition
 import threading
 
+import traceback
+
 ### Utility functions
 class bcolors:
   # https://godoc.org/github.com/whitedevops/colors
@@ -309,7 +311,10 @@ class IterateEvent(Event):
     try:
       event_dispatch.blackboard[
         iterable_object_key].iterate(event_dispatch)
-    except:
+    except Exception as e:
+      print(e)
+      track = traceback.format_exc()
+      print(track)
       self._exception = True
 
   def finish(self, event_dispatch, *args, **kwargs):
@@ -327,6 +332,7 @@ class IterateEvent(Event):
     # and the ED, aka, a **sibling** thread
 
     if self._exception:
+      print("exception caught")
       return
 
     iterable_object_key = args[0]
@@ -416,7 +422,7 @@ class EventDispatch(object):
 
   def dispatch_finish(self, event, *args, **kwargs):
     self.thread_registry.pop(event.get_id(), None)
-    self.log("finishing %s" % (event.get_id())) # debug
+    # self.log("finishing %s" % (event.get_id())) # debug
     event.finish(self, *args, **kwargs)
     # ONLY the event defines what is dispatched next
     # this includes multiple subsequent concurrent events
