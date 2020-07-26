@@ -1,4 +1,8 @@
 import numpy as np
+np.set_printoptions(precision=3)
+np.set_printoptions(suppress=True)
+np.set_printoptions(formatter={'float': '{: 0.4f}'.format})
+
 from pupper.HardwareConfig import MICROS_PER_RAD, NEUTRAL_ANGLE_DEGREES, PS4_COLOR, PS4_DEACTIVATED_COLOR
 from enum import Enum
 
