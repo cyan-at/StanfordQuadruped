@@ -74,10 +74,20 @@ class JoystickInterface:
         height_movement = msg["dpady"]
         command.height = state.height -\
             message_dt * self.config.z_speed * height_movement
+
+        # this button is not constantly streaming
+        # so transmit delta not state
+        # so when you hold the button, no delta
+        # the last delta is still applied => keep changing
+        # stream semantics #cool
+        command.height_delta = msg["dpady"]
         
         roll_movement = - msg["dpadx"]
         command.roll = state.roll +\
             message_dt * self.config.roll_speed * roll_movement
+
+        # stream semantics #cool
+        command.roll_delta = msg["dpadx"]
 
         return command
 

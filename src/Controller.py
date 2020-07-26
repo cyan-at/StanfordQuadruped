@@ -151,7 +151,33 @@ class Controller:
                     self.config.yaw_time_constant,
                 )
             )
-            # Set the foot locations to the default stance plus the standard height
+            # Set the foot locations to the default
+            # stance plus the standard height
+            # note that height is only relevant
+            # for BehaviorState.REST
+
+            # propagate command.height/roll here
+            # because Controller is ALWAYS running
+            # for stream semantics #cool
+            command.height = state.height -\
+                self.config.dt * self.config.z_speed * command.height_delta
+            command.roll = state.roll +\
+                self.config.dt * self.config.roll_speed * command.roll_delta
+
+            # clamping in case comms loss
+            if command.height > self.config.max_cmd_height:
+                command.height = self.config.max_cmd_height
+            elif command.height < self.config.min_cmd_height:
+                command.height = self.config.min_cmd_height
+
+            if command.roll > self.config.max_cmd_roll:
+                command.roll = self.config.max_cmd_roll
+            elif command.roll < self.config.min_cmd_roll:
+                command.roll = self.config.min_cmd_roll
+
+            print("controller height %.3f, roll %.3f" % (
+                command.height, command.roll))
+
             state.foot_locations = (
                 self.config.default_stance
                 + np.array([0, 0, command.height])[:, np.newaxis]

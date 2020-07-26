@@ -9,7 +9,6 @@ class State:
         self.height = -0.16
         self.pitch = 0.0
         self.roll = 0.0
-        self.activation = 0
         self.behavior_state = BehaviorState.REST
 
         self.ticks = 0
