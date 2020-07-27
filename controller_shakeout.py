@@ -275,6 +275,10 @@ class CommandSerialBridge(SerialBridge):
     if k in self._temp_mapping:
       k = self._temp_mapping[k]
 
+    if k == "mode" and v == 0:
+      self.teardown(self.external_blackboard)
+      return
+
     # produce a command to cmd_target if it's something
     # pupper cares about
     if (k not in self._msg):
@@ -380,7 +384,7 @@ if __name__ == "__main__":
     sys.exit(1)
   blackboard["sb"] = sb
 
-  pupper = Pupper(args.simulate == 0)
+  pupper = Pupper(args.simulate == 1)
   pupper.init(blackboard)
   if not pupper.initialized():
     print("couldn't initialize pupper")
