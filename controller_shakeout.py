@@ -24,11 +24,13 @@ from pupper.Kinematics import four_legs_inverse_kinematics
 
 # command
 from gamepad import *
-from serial_bridge import *
 from src.Command import Command
 from src.JoystickInterface import JoystickInterface
 
 from common import IterateEvent
+
+from serial_bridge import *
+from common import isint, isfloat
 
 class Pupper(IterableObject):
   def __init__(self, simulate = False):
@@ -251,7 +253,12 @@ class CommandSerialBridge(SerialBridge):
   def produce(self, data):
     if "," not in data:
       return
+
     k, v = data.split(",")
+    if isint(v):
+      v = int(v)
+    else:
+      v = float(v)
 
     # produce a command to cmd_target if it's something
     # pupper cares about
@@ -316,7 +323,12 @@ if __name__ == "__main__":
   import argparse
   from threading import Lock, Condition, Thread
 
-  parser = argparse.ArgumentParser()
+  parser = argparse.ArgumentParser(
+    description="")
+  parser.add_argument('--serial', type=str,
+    default="/dev/ttyACM0")
+  parser.add_argument('--baudrate', type=int,
+    default=38400)
   args = parser.parse_args()
 
   ############### overhead
@@ -339,7 +351,7 @@ if __name__ == "__main__":
   #   sys.exit(1)
   # blackboard["gamepad"] = gamepad
 
-  sb = SerialBridge()
+  sb = CommandSerialBridge()
   sb.init(
     args.serial,
     args.baudrate,
@@ -350,7 +362,7 @@ if __name__ == "__main__":
     sys.exit(1)
   blackboard["sb"] = sb
 
-  pupper = Pupper(False)
+  pupper = Pupper(True)
   pupper.init(blackboard)
   if not pupper.initialized():
     print("couldn't initialize pupper")
@@ -358,12 +370,22 @@ if __name__ == "__main__":
   blackboard["pupper"] = pupper
 
   ############### dispatches
+  # gamepad_ed = BlackboardQueueCVED(
+  #   blackboard, "gamepad")
+  # blackboard["gamepad_thread"] = Thread(
+  #   target=gamepad_ed.run,
+  #   args=(blackboard,
+  #     "gamepad",
+  #     # "done",
+  #     None,
+  #     bcolors.CYAN))
+
   gamepad_ed = BlackboardQueueCVED(
-    blackboard, "gamepad")
-  blackboard["gamepad_thread"] = Thread(
+    blackboard, "sb")
+  blackboard["sb_thread"] = Thread(
     target=gamepad_ed.run,
     args=(blackboard,
-      "gamepad",
+      "sb",
       # "done",
       None,
       bcolors.CYAN))
@@ -383,11 +405,17 @@ if __name__ == "__main__":
   blackboard["CmdSetEvent"] = CmdSetEvent
 
   ############### process init
-  blackboard["gamepad_cv"].acquire()
-  blackboard["gamepad_queue"].append(
-    ["IterateEvent", 1, "gamepad", "gamepad"])
-  blackboard["gamepad_cv"].notify(1)
-  blackboard["gamepad_cv"].release()
+  # blackboard["gamepad_cv"].acquire()
+  # blackboard["gamepad_queue"].append(
+  #   ["IterateEvent", 1, "gamepad", "gamepad"])
+  # blackboard["gamepad_cv"].notify(1)
+  # blackboard["gamepad_cv"].release()
+
+  blackboard["sb_cv"].acquire()
+  blackboard["sb_queue"].append(
+    ["IterateEvent", 1, "sb", "sb"])
+  blackboard["sb_cv"].notify(1)
+  blackboard["sb_cv"].release()
 
   blackboard["pupper_cv"].acquire()
   blackboard["pupper_queue"].append(
@@ -396,7 +424,8 @@ if __name__ == "__main__":
   blackboard["pupper_cv"].release()
 
   ############### process lifecycle
-  blackboard["gamepad_thread"].start()
+  # blackboard["gamepad_thread"].start()
+  blackboard["sb_thread"].start()
   blackboard["pupper_thread"].start()
 
   # really it is wait on a Condition that
