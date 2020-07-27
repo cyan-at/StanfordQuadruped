@@ -218,6 +218,17 @@ class CommandSerialBridge(SerialBridge):
       # "triangle": triangle,
     }
 
+    # because controller m00 gamepad is not updated
+    # fix it here
+    self._temp_mapping = {
+      "tl" : "L1",
+      "tr" : "R1",
+      "hat0y" : "dpady",
+      "hat0x" : "dpadx",
+      "x" : "lx",
+      "y" : "ly",
+    }
+
     self._cmd_target_name = None
 
     super(CommandSerialBridge, self).__init__()
@@ -260,6 +271,9 @@ class CommandSerialBridge(SerialBridge):
       v = float(v)
       if int(v) == v:
         v = int(v)
+
+    if k in self._temp_mapping:
+      k = self._temp_mapping[k]
 
     # produce a command to cmd_target if it's something
     # pupper cares about
