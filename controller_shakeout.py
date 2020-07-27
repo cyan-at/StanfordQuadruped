@@ -275,7 +275,7 @@ class CommandSerialBridge(SerialBridge):
     if k in self._temp_mapping:
       k = self._temp_mapping[k]
 
-    if k == "mode" and v == 0:
+    if k == "select" and v == 0:
       self.teardown(self.external_blackboard)
       return
 
