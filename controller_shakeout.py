@@ -345,6 +345,8 @@ if __name__ == "__main__":
     default="/dev/ttyACM0")
   parser.add_argument('--baudrate', type=int,
     default=38400)
+  parser.add_argument('--simulate', type=int,
+    default=1)
   args = parser.parse_args()
 
   ############### overhead
@@ -378,7 +380,7 @@ if __name__ == "__main__":
     sys.exit(1)
   blackboard["sb"] = sb
 
-  pupper = Pupper(True)
+  pupper = Pupper(args.simulate == 0)
   pupper.init(blackboard)
   if not pupper.initialized():
     print("couldn't initialize pupper")
