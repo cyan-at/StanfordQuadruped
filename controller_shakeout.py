@@ -264,6 +264,7 @@ class CommandSerialBridge(SerialBridge):
     # produce a command to cmd_target if it's something
     # pupper cares about
     if (k not in self._msg):
+      print("k not found", k)
       return
 
     self._msg[k] = v
