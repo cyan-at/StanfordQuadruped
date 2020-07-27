@@ -28,6 +28,28 @@ class SerialBridge(IterableObject):
     # https://stackoverflow.com/a/38495159/13139390
     time.sleep(2)
 
+    self.external_blackboard = None
+    self.init_external_blackboard(*args)
+
+  def init_external_blackboard(self, *args):
+    # for child classes to override
+
+    # base class
+    # expect args[0] to be dict
+    # exposes 1 str
+    # and sets member var
+    if type(args[2]) is not dict:
+      raise Exception("external_blackboard not dict")
+    self.external_blackboard = args[2]
+    self.external_blackboard["rx_buffer"] = ""
+
+  def produce(self, data):
+    # for child classes to override
+
+    # base class is pass-through to buffer
+    self.external_blackboard["rx_buffer"] = data
+    print(data)
+
   def teardown(self, blackboard):
     # for child classes to override
 
@@ -48,11 +70,11 @@ class SerialBridge(IterableObject):
     read_data = read_data.decode('ascii').rstrip('\r\n')
 
     if len(read_data) > 0:
-      self._blackboard["rx_buffer"] = read_data
-      print(self._blackboard["rx_buffer"])
+      if read_data == "end":
+        self.teardown(args[0].blackboard)
+        return
 
-    if self._blackboard["rx_buffer"] == "end":
-      self.teardown(args[0].blackboard)
+      self.produce(read_data)
 
   def do_cleanup(self):
     try:
@@ -89,7 +111,7 @@ if __name__ == '__main__':
 
   ############### actors
   sb = SerialBridge()
-  sb.init(args.serial, args.baudrate)
+  sb.init(args.serial, args.baudrate, blackboard)
   if not sb.initialized():
     print("couldn't initialize sb")
     sys.exit(1)
