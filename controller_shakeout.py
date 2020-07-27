@@ -363,7 +363,7 @@ if __name__ == "__main__":
     sys.exit(1)
   blackboard["sb"] = sb
 
-  pupper = Pupper(False)
+  pupper = Pupper(True)
   pupper.init(blackboard)
   if not pupper.initialized():
     print("couldn't initialize pupper")
