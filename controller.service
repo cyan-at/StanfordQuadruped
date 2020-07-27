@@ -1,0 +1,11 @@
+[Unit]
+Description=Robot control service
+
+[Service]
+ExecStartPre=-sudo pigpiod
+ExecStart=/usr/bin/python3 /home/pi/StanfordQuadruped/controller_shakeout.py --simulate 0
+KillSignal=2
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
