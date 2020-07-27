@@ -70,11 +70,11 @@ class Configuration:
         self.max_stance_yaw = 1.2
         self.max_stance_yaw_rate = 2.0
 
-        self.max_cmd_height = -0.08
+        self.max_cmd_height = -0.05
         self.min_cmd_height = -0.2
 
-        self.max_cmd_roll = 0.03
-        self.min_cmd_roll = -0.03
+        self.max_cmd_roll = 0.1
+        self.min_cmd_roll = -0.1
 
         #################### STANCE ####################
         self.delta_x = 0.1
