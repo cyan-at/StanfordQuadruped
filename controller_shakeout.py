@@ -255,10 +255,11 @@ class CommandSerialBridge(SerialBridge):
       return
 
     k, v = data.split(",")
-    if isint(v):
-      v = int(v)
-    else:
+
+    if isfloat(v):
       v = float(v)
+      if int(v) == v:
+        v = int(v)
 
     # produce a command to cmd_target if it's something
     # pupper cares about
@@ -362,7 +363,7 @@ if __name__ == "__main__":
     sys.exit(1)
   blackboard["sb"] = sb
 
-  pupper = Pupper(True)
+  pupper = Pupper(False)
   pupper.init(blackboard)
   if not pupper.initialized():
     print("couldn't initialize pupper")
