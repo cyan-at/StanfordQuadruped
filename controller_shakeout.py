@@ -373,23 +373,60 @@ if __name__ == "__main__":
   #   sys.exit(1)
   # blackboard["gamepad"] = gamepad
 
-  sb = CommandSerialBridge()
-  sb.init(
-    args.serial,
-    args.baudrate,
-    blackboard,
-    "pupper")
-  if not sb.initialized():
-    print("couldn't initialize sb")
-    sys.exit(1)
-  blackboard["sb"] = sb
+  if len(args.serial) > 0:
+    sb = CommandSerialBridge()
+    sb.init(
+      args.serial,
+      args.baudrate,
+      blackboard,
+      "pupper")
+    if not sb.initialized():
+      print("couldn't initialize sb")
+      sys.exit(1)
+    blackboard["sb_iterable"] = sb
+
+    # dispatch, actor consumes / produces
+    sb_ed = BlackboardQueueCVED(
+      blackboard, "sb")
+    blackboard["sb_thread"] = Thread(
+      target=sb_ed.run,
+      args=(blackboard,
+        "sb",
+        # "done",
+        None,
+        bcolors.CYAN))
+
+    ############### actor context setup
+    blackboard["sb_cv"].acquire()
+    blackboard["sb_queue"].append(
+      ["IterateEvent", 1, "sb_iterable", "sb"])
+    blackboard["sb_cv"].notify(1)
+    blackboard["sb_cv"].release()
 
   pupper = Pupper(args.simulate == 1)
   pupper.init(blackboard)
   if not pupper.initialized():
     print("couldn't initialize pupper")
     sys.exit(1)
-  blackboard["pupper"] = pupper
+  blackboard["pupper_iterable"] = pupper
+
+  # dispatch, actor consumes / produces
+  pupper_ed = BlackboardQueueCVED(
+    blackboard, "pupper")
+  blackboard["pupper_thread"] = Thread(
+    target=pupper_ed.run,
+    args=(blackboard,
+      "pupper",
+      # "done",
+      None,
+      bcolors.GREEN))
+
+  ############### actor context setup
+  blackboard["pupper_cv"].acquire()
+  blackboard["pupper_queue"].append(
+    ["IterateEvent", 1, "pupper_iterable", "pupper"])
+  blackboard["pupper_cv"].notify(1)
+  blackboard["pupper_cv"].release()
 
   ############### dispatches
   # gamepad_ed = BlackboardQueueCVED(
@@ -402,53 +439,23 @@ if __name__ == "__main__":
   #     None,
   #     bcolors.CYAN))
 
-  gamepad_ed = BlackboardQueueCVED(
-    blackboard, "sb")
-  blackboard["sb_thread"] = Thread(
-    target=gamepad_ed.run,
-    args=(blackboard,
-      "sb",
-      # "done",
-      None,
-      bcolors.CYAN))
-
-  pupper_ed = BlackboardQueueCVED(
-    blackboard, "pupper")
-  blackboard["pupper_thread"] = Thread(
-    target=pupper_ed.run,
-    args=(blackboard,
-      "pupper",
-      # "done",
-      None,
-      bcolors.GREEN))
-
-  ############### events
-  blackboard["IterateEvent"] = IterateEvent
-  blackboard["CmdSetEvent"] = CmdSetEvent
-
-  ############### process init
+  ############### actor context setup
   # blackboard["gamepad_cv"].acquire()
   # blackboard["gamepad_queue"].append(
   #   ["IterateEvent", 1, "gamepad", "gamepad"])
   # blackboard["gamepad_cv"].notify(1)
   # blackboard["gamepad_cv"].release()
 
-  blackboard["sb_cv"].acquire()
-  blackboard["sb_queue"].append(
-    ["IterateEvent", 1, "sb", "sb"])
-  blackboard["sb_cv"].notify(1)
-  blackboard["sb_cv"].release()
-
-  blackboard["pupper_cv"].acquire()
-  blackboard["pupper_queue"].append(
-    ["IterateEvent", 1, "pupper", "pupper"])
-  blackboard["pupper_cv"].notify(1)
-  blackboard["pupper_cv"].release()
+  ############### events
+  blackboard["IterateEvent"] = IterateEvent
+  blackboard["CmdSetEvent"] = CmdSetEvent
 
   ############### process lifecycle
-  # blackboard["gamepad_thread"].start()
-  blackboard["sb_thread"].start()
-  blackboard["pupper_thread"].start()
+  for k in blackboard.keys():
+    if k[-7:] != "_thread":
+      continue
+    print("starting", k)
+    blackboard[k].start()
 
   # really it is wait on a Condition that
   # all consumers notify
@@ -458,7 +465,7 @@ if __name__ == "__main__":
     [
       # queue names that are admissible
       # if they are nonempty
-      "gamepad_queue",
+      "sb_queue",
       "pupper_queue"
     ],
     verbose = True
@@ -495,6 +502,8 @@ if __name__ == "__main__":
     print("joining", k)
     blackboard[k].join()
 
-  # gamepad.cleanup()
-  sb.cleanup()
-  pupper.cleanup()
+  for k in blackboard.keys():
+    if k[-9:] != "_iterable":
+      continue
+    print("cleanup", k)
+    blackboard[k].cleanup()
