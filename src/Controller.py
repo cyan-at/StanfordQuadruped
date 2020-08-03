@@ -17,8 +17,7 @@ class Controller:
     def __init__(
         self,
         config,
-        inverse_kinematics,
-    ):
+        inverse_kinematics):
         self.config = config
 
         self.smoothed_yaw = 0.0  # for REST mode only
@@ -29,6 +28,7 @@ class Controller:
         self.swing_controller = SwingController(self.config)
         self.stance_controller = StanceController(self.config)
 
+        # define a state machine
         self.hop_transition_mapping = {
             BehaviorState.REST: BehaviorState.HOP,
             BehaviorState.HOP: BehaviorState.FINISHHOP,
@@ -85,6 +85,7 @@ class Controller:
         """
 
         ########## Update operating state based on command ######
+        ########## State machines grrrrr :( ######
         if command.activate_event and\
             state.behavior_state in self.activate_transition_mapping:
             state.behavior_state = self.activate_transition_mapping[
@@ -127,6 +128,7 @@ class Controller:
             cmd_foot_locations = rotated_foot_locations
 
         elif state.behavior_state == BehaviorState.HOP:
+            # crouch down
             state.foot_locations = (
                 self.config.default_stance
                 + np.array([0, 0, -0.09])[:, np.newaxis]
@@ -134,6 +136,7 @@ class Controller:
             cmd_foot_locations = state.foot_locations
 
         elif state.behavior_state == BehaviorState.FINISHHOP:
+            # pop up
             state.foot_locations = (
                 self.config.default_stance
                 + np.array([0, 0, -0.22])[:, np.newaxis]

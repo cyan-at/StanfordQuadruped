@@ -300,7 +300,7 @@ class CommandSerialBridge(SerialBridge):
     cmd = self.joystick_interface.build_command(
       self.external_blackboard["pupper"].state,
       self._msg)
-    print("cmd", cmd)
+    print(cmd)
 
     self.external_blackboard[self._cmd_target_name + "_cv"].acquire()
     self.external_blackboard[self._cmd_target_name + "_queue"].append(
