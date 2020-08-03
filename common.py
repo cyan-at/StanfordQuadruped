@@ -370,6 +370,7 @@ class IterateEvent(Event):
     tokens = args[0] # args is a tuple of 1 list, that list is tokens
     if len(tokens) != 3:
       raise Exception("expected 3 tokens")
+      # event_id, iterable_object_key, ed_prefix
     return (int(tokens[0]), blackboard), (tokens[1], tokens[2]) # tuple
 
 # JQ3uqm

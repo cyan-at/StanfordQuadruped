@@ -200,7 +200,8 @@ class Gamepad(IterableObject):
 
     # in this case, close'ing the underlying blocking
     # process will force that event to end
-    blackboard["gamepad"].js_object.close()
+    # blackboard["gamepad"].js_object.close()
+    self.js_object.close()
 
   def do_iterate(self, *args, **kwargs):
     evbuf = self.js_object.read(8)

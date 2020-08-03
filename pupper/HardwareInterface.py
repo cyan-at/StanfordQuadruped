@@ -109,9 +109,10 @@ class HardwareInterface:
         self._simulate = simulate
 
         if not self._simulate:
-            self.pi = pigpio.pi()
             self.pwm_params = PWMParams()
             self.servo_params = ServoParams()
+
+            self.pi = pigpio.pi()
             initialize_pwm(self.pi, self.pwm_params)
 
     def set_actuator_postions(self, joint_angles):

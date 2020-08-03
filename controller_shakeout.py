@@ -23,14 +23,14 @@ from pupper.Config import Configuration
 from pupper.Kinematics import four_legs_inverse_kinematics
 
 # command
-from gamepad import *
 from src.Command import Command
 from src.JoystickInterface import JoystickInterface
 
 from common import IterateEvent
+from common import isint, isfloat
 
 from serial_bridge import *
-from common import isint, isfloat
+from gamepad import *
 
 class Pupper(IterableObject):
   def __init__(self, simulate = False):
@@ -124,6 +124,8 @@ class CommandGamepad(Gamepad):
 
     self._cmd_target_name = None
 
+    self._iterable_target = None
+
     super(CommandGamepad, self).__init__()
 
   def init_external_blackboard(self, *args):
@@ -131,13 +133,17 @@ class CommandGamepad(Gamepad):
     # what pupper_ed needs
 
     if type(args[0]) is not dict:
-      raise Exception("CommandGamepad expects dict, str")
+      raise Exception("CommandGamepad expects dict, str, str")
     if type(args[1]) is not str:
-      raise Exception("CommandGamepad expects dict, str")
+      raise Exception("CommandGamepad expects dict, str, str")
+    if type(args[2]) is not str:
+      raise Exception("CommandGamepad expects dict, str, str")
 
     self.external_blackboard = args[0]
 
     self._cmd_target_name = args[1]
+
+    self._iterable_target = args[2]
 
     mutex_name = self._cmd_target_name + "_mutex"
     if mutex_name not in self.external_blackboard:
@@ -163,7 +169,7 @@ class CommandGamepad(Gamepad):
     self._msg[k] = v
 
     cmd = self.joystick_interface.build_command(
-      self.external_blackboard["pupper"].state,
+      self.external_blackboard[self._iterable_target].state,
       self._msg)
     print("cmd", cmd)
 
@@ -172,7 +178,7 @@ class CommandGamepad(Gamepad):
       [
         "CmdSetEvent",
         1,
-        self._cmd_target_name,
+        self._iterable_target,
         self._cmd_target_name,
         cmd])
     self.external_blackboard[self._cmd_target_name + "_cv"].notify(1)
@@ -238,13 +244,17 @@ class CommandSerialBridge(SerialBridge):
     # what pupper_ed needs
 
     if type(args[2]) is not dict:
-      raise Exception("CommandSerialBridge expects dict, str")
+      raise Exception("CommandSerialBridge expects dict, str, str")
     if type(args[3]) is not str:
-      raise Exception("CommandSerialBridge expects dict, str")
+      raise Exception("CommandSerialBridge expects dict, str, str")
+    if type(args[4]) is not str:
+      raise Exception("CommandSerialBridge expects dict, str, str")
 
     self.external_blackboard = args[2]
 
     self._cmd_target_name = args[3]
+
+    self._iterable_target = args[4]
 
     mutex_name = self._cmd_target_name + "_mutex"
     if mutex_name not in self.external_blackboard:
@@ -297,7 +307,7 @@ class CommandSerialBridge(SerialBridge):
       [
         "CmdSetEvent",
         1,
-        self._cmd_target_name,
+        self._iterable_target,
         self._cmd_target_name,
         cmd])
     self.external_blackboard[self._cmd_target_name + "_cv"].notify(1)
@@ -316,7 +326,7 @@ class CmdSetEvent(IterateEvent):
     # set the pupper's cmd
     # print("updating pupper cmd")
     event_dispatch.blackboard[
-      "pupper"]._cmd = args[2]
+      args[0]]._cmd = args[2]
 
     super(CmdSetEvent, self).dispatch(
       event_dispatch, *args, **kwargs)
@@ -334,6 +344,7 @@ class CmdSetEvent(IterateEvent):
     tokens = args[0] # args is a tuple of 1 list, that list is tokens
     if len(tokens) != 4:
       raise Exception("expected 4 token")
+      # event_id, iterable_object_key, ed_prefix, cmd
     return (int(tokens[0]), blackboard), (tokens[1], tokens[2], tokens[3]) # tuple
 
 if __name__ == "__main__":
@@ -366,12 +377,31 @@ if __name__ == "__main__":
   blackboard["done_queue"] = [1]
 
   ############### actors
-  # gamepad = CommandGamepad()
-  # gamepad.init(blackboard, "pupper")
-  # if not gamepad.initialized():
-  #   print("couldn't initialize gamepad")
-  #   sys.exit(1)
-  # blackboard["gamepad"] = gamepad
+  gamepad = CommandGamepad()
+  gamepad.init(blackboard, "pupper", "pupper_iterable")
+  if not gamepad.initialized():
+    print("couldn't initialize gamepad")
+    # sys.exit(1)
+  else:
+    blackboard["gamepad_iterable"] = gamepad
+
+    # dispatch, actor consumes / produces
+    gamepad_ed = BlackboardQueueCVED(
+      blackboard, "gamepad")
+    blackboard["gamepad_thread"] = Thread(
+      target=gamepad_ed.run,
+      args=(blackboard,
+        "gamepad",
+        # "done",
+        None,
+        bcolors.HEADER))
+
+    ############### actor context setup
+    blackboard["gamepad_cv"].acquire()
+    blackboard["gamepad_queue"].append(
+      ["IterateEvent", 1, "gamepad_iterable", "gamepad"])
+    blackboard["gamepad_cv"].notify(1)
+    blackboard["gamepad_cv"].release()
 
   if len(args.serial) > 0:
     sb = CommandSerialBridge()
