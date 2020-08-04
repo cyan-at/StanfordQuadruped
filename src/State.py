@@ -20,7 +20,9 @@ class State:
         self.quat_orientation = np.array([1, 0, 0, 0])
 
 class BehaviorState(Enum):
-    DEACTIVATED = -1
+    DEACTIVATED = -3
+    RISING = -2
+    RISEN = -1
     REST = 0
     TROT = 1
     HOP = 2

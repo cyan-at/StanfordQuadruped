@@ -42,7 +42,9 @@ class Controller:
             BehaviorState.FINISHHOP: BehaviorState.TROT}
 
         self.activate_transition_mapping = {
-            BehaviorState.DEACTIVATED: BehaviorState.REST,
+            BehaviorState.DEACTIVATED: BehaviorState.RISING,
+            BehaviorState.RISING: BehaviorState.RISEN,
+            BehaviorState.RISEN: BehaviorState.REST,
             BehaviorState.REST: BehaviorState.DEACTIVATED}
 
 
