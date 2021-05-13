@@ -1,4 +1,8 @@
-import pigpio
+try:
+    import pigpio
+except:
+    pass
+
 from pupper.Config import ServoParams, PWMParams
 
 def initialize_pwm(pi, pwm_params):

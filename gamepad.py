@@ -99,7 +99,7 @@ class Gamepad(IterableObject):
 
     # Iterate over the joystick devices
     tries = 0
-    while len(self._blackboard["js_device"]) == 0 and tries < 240:
+    while len(self._blackboard["js_device"]) == 0 and tries < 10:
       print('finding joystick devices')
       for fn in os.listdir('/dev/input'):
         if fn.startswith('js'):

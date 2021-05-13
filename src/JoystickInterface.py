@@ -51,8 +51,8 @@ class JoystickInterface:
         self.previous_activate_toggle = activate_toggle
 
         ####### Handle continuous commands ########
-        x_vel = msg["ly"] * self.config.max_x_velocity
-        y_vel = msg["lx"] * -self.config.max_y_velocity
+        x_vel = msg["lx"] * self.config.max_x_velocity
+        y_vel = msg["ly"] * -self.config.max_y_velocity
         command.horizontal_velocity = np.array([x_vel, y_vel])
         command.yaw_rate = msg["rx"] * -self.config.max_yaw_rate
 
