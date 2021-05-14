@@ -441,6 +441,7 @@ class AudioAdapter1(object):
     # cycle across
     # None, assign random and do
     # non-None, assign counter and do
+    self._last_move_state = 0 # 0 = null'd, 1 = going out, 2 = correcting
 
     self._moves_to_do = 0
     # random between 1 an 10 moves
@@ -468,31 +469,36 @@ class AudioAdapter1(object):
 
         # if self._last_move not set, set it randomly
         # else, leave it alone
-        cleanup = False
         if self._last_move is None:
           rand_idx = random.randint(
             0, len(self._move_keys)-1)
           self._last_move = self._move_keys[rand_idx]
           # TODO: this could mean 2
           # consecutive moves that are the same :\
-        else:
-          cleanup = True
+          self._last_move_state = 0
         # print("\nself._last_move %s" % (self._last_move))
 
+        # with self._last_move is set
+        # we apply a random update, then correct, then null
         if type(self._moves[self._last_move]) == int:
           if self._moves[self._last_move] == 0:
             self._moves[self._last_move] = 1
           else:
             self._moves[self._last_move] = 0
         else:
-          if abs(self._moves[self._last_move]) < 1e-8:
+          # if abs(self._moves[self._last_move]) < 1e-8:
+          if self._last_move_state == 0:
             self._moves[self._last_move]\
               += random.uniform(-1.0, 1.0)
             # print("GOING OUT!")
-          else:
+          # else:
+          elif self._last_move_state == 1:
             self._moves[self._last_move]\
-              -= self._moves[self._last_move]
+              -= 2.0 * self._moves[self._last_move]
             # print("CORRECTING")
+          elif self._last_move_state == 2:
+            self._moves[self._last_move] = 0.0
+            # print("ZEROING")
 
         # add to _moves_queue
         self._moves_queue.append([
@@ -500,9 +506,11 @@ class AudioAdapter1(object):
 
         if len(self._moves_queue) > 0:
           pupper_k, pupper_v = self._moves_queue.pop(0)
-          repeat = 5
+          # repeat = 5
 
-        if cleanup:
+        # iterate overhead
+        self._last_move_state = (self._last_move_state + 1) % 3
+        if self._last_move_state == 0:
           self._last_move = None
 
         self._moves_to_do -= 1
