@@ -463,6 +463,8 @@ class AudioAdapter1(object):
         if self._moves_to_do == 0:
           self._moves_to_do = random.randint(
             1, 10)
+        print("starting dance set of %d" % (
+          self._moves_to_do))
 
         # if self._last_move not set, set it randomly
         # else, leave it alone
@@ -498,7 +500,7 @@ class AudioAdapter1(object):
 
         if len(self._moves_queue) > 0:
           pupper_k, pupper_v = self._moves_queue.pop(0)
-          # repeat = 5
+          repeat = 5
 
         if cleanup:
           self._last_move = None
@@ -632,7 +634,7 @@ class SimulatedFinSerialBridge(FinSerialBridge):
       "audiostream" : ["1"]
     }
 
-    self._random_interval = 5.0
+    self._random_interval = 3.0
     self._queued_simulated_read_data = "serial,M"
     # load up activating pupper
 
@@ -661,7 +663,7 @@ class SimulatedFinSerialBridge(FinSerialBridge):
     # self._queued_simulated_read_data = "serial," +\
     #   self._simulate_data["serial"][random_next]
 
-    self._random_interval = random.uniform(1.0, 3.0)
+    self._random_interval = random.uniform(0.0, 2.0)
 
 class CmdSetEvent(IterateEvent):
   def dispatch(self, event_dispatch, *args, **kwargs):
