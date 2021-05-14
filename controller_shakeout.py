@@ -48,7 +48,7 @@ from serial_bridge import *
 from gamepad import *
 
 class Pupper(IterableObject):
-  def __init__(self, simulate = False):
+  def __init__(self, simulate = False, activated = False):
     super(Pupper, self).__init__()
 
     self._blackboard = None
@@ -63,7 +63,9 @@ class Pupper(IterableObject):
     )
     self.state = State()
 
-    self.activated = False
+    self.activated = activated
+    if activated:
+      self._cmd.activate_event = 1
 
     self._cmd = Command()
 
@@ -80,10 +82,10 @@ class Pupper(IterableObject):
     self._blackboard = args[0]
 
   def do_iterate(self, *args, **kwargs):
+    cleanup = False
     if self._cmd.activate_event == 1:
       self.activated = not self.activated
-      # unset it immediately, do not wait for gamepad
-      self._cmd.activate_event = 0
+      cleanup = True
 
     if self.activated:
       now = time.time()
@@ -101,6 +103,10 @@ class Pupper(IterableObject):
       self._last_t = time.time()
 
     time.sleep(self.config.dt)
+
+    if cleanup:
+      # unset it immediately, do not wait for gamepad
+      self._cmd.activate_event = 0
 
   def do_cleanup(self):
     pass
@@ -606,9 +612,22 @@ class SimulatedFinSerialBridge(FinSerialBridge):
     self.init_external_blackboard(*args)
 
     self._simulate_data = {
-      "serial" : ["F", "B", "L", "R", "H", "T", "t", "Q", "q", "M", "A"],
+      "serial" : [
+        "F",
+        "B",
+        "L",
+        "R",
+        "H",
+        "T",
+        "t",
+        "Q",
+        "q"],
       "audiostream" : ["1"]
     }
+
+    self._random_interval = 5.0
+    self._queued_simulated_read_data = "serial,M"
+    # load up activating pupper
 
   def do_iterate(self, *args, **kwargs):
     if len(self._blackboard["tx_buffer"]) > 0:
@@ -619,16 +638,23 @@ class SimulatedFinSerialBridge(FinSerialBridge):
     '''
     read_data = self._serial_handle.readline()
     read_data = read_data.decode('ascii').rstrip('\r\n')
-    '''
-
-    read_data = "serial,F"
 
     if len(read_data) > 0:
       if read_data == "end":
         self.teardown(args[0].blackboard)
         return
+    '''
 
-      self.produce(read_data)
+    time.sleep(self._random_interval)
+    self.produce(self._queued_simulated_read_data)
+
+    self._queued_simulated_read_data = "audiostream,1"
+    # random_next = random.randint(0, len(
+    #   self._simulate_data["serial"]))
+    # self._queued_simulated_read_data = "serial," +\
+    #   self._simulate_data["serial"][random_next]
+
+    self._random_interval = random.uniform(3.0, 5.0)
 
 class CmdSetEvent(IterateEvent):
   def dispatch(self, event_dispatch, *args, **kwargs):
@@ -721,8 +747,7 @@ if __name__ == "__main__":
       "pupper",
       "pupper_iterable")
     if not sb.initialized():
-      print("no sb, running in 'headless' mode")
-      # sys.exit(1)
+      print("no sb, running SimulatedFinSerialBridge")
       sb = SimulatedFinSerialBridge()
       sb.init(
         args.serial,
@@ -751,7 +776,8 @@ if __name__ == "__main__":
     blackboard["sb_cv"].notify(1)
     blackboard["sb_cv"].release()
 
-  pupper = Pupper(args.simulate == 1)
+  pupper = Pupper(
+    args.simulate > 0)
   pupper.init(blackboard)
   if not pupper.initialized():
     print("couldn't initialize pupper")
