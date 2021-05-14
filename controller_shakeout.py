@@ -464,13 +464,18 @@ class AudioAdapter1(object):
           self._moves_to_do = random.randint(
             1, 10)
 
+        # if self._last_move not set, set it randomly
+        # else, leave it alone
         cleanup = False
         if self._last_move is None:
           rand_idx = random.randint(
-            0, len(self._move_keys))
+            0, len(self._move_keys)-1)
           self._last_move = self._move_keys[rand_idx]
+          # TODO: this could mean 2
+          # consecutive moves that are the same :\
         else:
           cleanup = True
+        # print("\nself._last_move %s" % (self._last_move))
 
         if type(self._moves[self._last_move]) == int:
           if self._moves[self._last_move] == 0:
@@ -478,12 +483,14 @@ class AudioAdapter1(object):
           else:
             self._moves[self._last_move] = 0
         else:
-          if self._moves[self._last_move] < 1e-8:
+          if abs(self._moves[self._last_move]) < 1e-8:
             self._moves[self._last_move]\
               += random.uniform(-1.0, 1.0)
+            # print("GOING OUT!")
           else:
             self._moves[self._last_move]\
               -= self._moves[self._last_move]
+            # print("CORRECTING")
 
         # add to _moves_queue
         self._moves_queue.append([
@@ -491,7 +498,7 @@ class AudioAdapter1(object):
 
         if len(self._moves_queue) > 0:
           pupper_k, pupper_v = self._moves_queue.pop(0)
-          repeat = 5
+          # repeat = 5
 
         if cleanup:
           self._last_move = None
@@ -650,11 +657,11 @@ class SimulatedFinSerialBridge(FinSerialBridge):
 
     self._queued_simulated_read_data = "audiostream,1"
     # random_next = random.randint(0, len(
-    #   self._simulate_data["serial"]))
+    #   self._simulate_data["serial"])-1)
     # self._queued_simulated_read_data = "serial," +\
     #   self._simulate_data["serial"][random_next]
 
-    self._random_interval = random.uniform(3.0, 5.0)
+    self._random_interval = random.uniform(1.0, 3.0)
 
 class CmdSetEvent(IterateEvent):
   def dispatch(self, event_dispatch, *args, **kwargs):
