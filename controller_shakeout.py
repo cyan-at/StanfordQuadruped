@@ -506,7 +506,7 @@ class AudioAdapter1(object):
 
         if len(self._moves_queue) > 0:
           pupper_k, pupper_v = self._moves_queue.pop(0)
-          # repeat = 5
+          repeat = 5
 
         # iterate overhead
         self._last_move_state = (self._last_move_state + 1) % 3
