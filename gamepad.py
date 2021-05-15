@@ -373,3 +373,105 @@ if __name__ == '__main__':
     blackboard[k].join()
 
   gamepad.cleanup()
+
+class CommandGamepad(Gamepad):
+  def __init__(self):
+    config = Configuration()
+    self.joystick_interface = JoystickInterface(config)
+
+    # joystickinterface expects a state
+    # whereas gamepad captures deltas
+    self._msg = {
+      # discrete between 0 (off) and 1 (on)
+      "R1": 0,
+      "x": 0,
+      "L1": 0,
+
+      # continuous these all go between 0.0 and 1.0
+      "ly": 0.0,
+      "lx": 0.0,
+      "rx": 0.0,
+      "ry": 0.0,
+      "dpady": 0.0,
+      "dpadx": 0.0,
+
+      # other
+      "message_rate": 20, # 20 Hz
+
+      # # unused
+      # "L2": L2,
+      # "R2": R2,
+      # "square": square,
+      # "circle": circle,
+      # "triangle": triangle,
+    }
+
+    self._cmd_target_name = None
+
+    self._iterable_target = None
+
+    super(CommandGamepad, self).__init__()
+
+  def init_external_blackboard(self, *args):
+    # initialize / forward-declare
+    # what pupper_ed needs
+
+    if type(args[0]) is not dict:
+      raise Exception("CommandGamepad expects dict, str, str")
+    if type(args[1]) is not str:
+      raise Exception("CommandGamepad expects dict, str, str")
+    if type(args[2]) is not str:
+      raise Exception("CommandGamepad expects dict, str, str")
+
+    self.external_blackboard = args[0]
+
+    self._cmd_target_name = args[1]
+
+    self._iterable_target = args[2]
+
+    mutex_name = self._cmd_target_name + "_mutex"
+    if mutex_name not in self.external_blackboard:
+      # without creating one explicitly
+      # condition has underlying mutex
+      self.external_blackboard[mutex_name] = Lock()
+
+    cv_name = self._cmd_target_name + "_cv"
+    if cv_name not in self.external_blackboard:
+      self.external_blackboard[cv_name] = Condition(
+        self.external_blackboard[mutex_name])
+
+    queue_name = self._cmd_target_name + "_queue"
+    if queue_name not in self.external_blackboard:
+      self.external_blackboard[queue_name] = []
+
+  def produce(self, k, v):
+    # produce a command to cmd_target if it's something
+    # pupper cares about
+    if (k not in self._msg):
+      return
+
+    self._msg[k] = v
+
+    cmd = self.joystick_interface.build_command(
+      self.external_blackboard[self._iterable_target].state,
+      self._msg)
+    # print("cmd", cmd)
+
+    self.external_blackboard[self._cmd_target_name + "_cv"].acquire()
+    self.external_blackboard[self._cmd_target_name + "_queue"].append(
+      [
+        "CmdSetEvent",
+        1,
+        self._iterable_target,
+        self._cmd_target_name,
+        cmd])
+    self.external_blackboard[self._cmd_target_name + "_cv"].notify(1)
+    self.external_blackboard[self._cmd_target_name + "_cv"].release()
+
+  def teardown(self, blackboard):
+    blackboard[self._cmd_target_name + "_cv"].acquire()
+    blackboard[self._cmd_target_name + "_queue"].clear()
+    blackboard[self._cmd_target_name + "_cv"].notify_all()
+    blackboard[self._cmd_target_name + "_cv"].release()
+
+    super(CommandGamepad, self).teardown(blackboard)

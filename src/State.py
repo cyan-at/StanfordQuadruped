@@ -9,13 +9,11 @@ class State:
         self.height = -0.16
         self.pitch = 0.0
         self.roll = 0.0
-        self.behavior_state = BehaviorState.REST
+        self.behavior_state = BehaviorState.DEACTIVATED
 
         self.ticks = 0
         self.foot_locations = np.zeros((3, 4))
         self.joint_angles = np.zeros((3, 4))
-
-        self.behavior_state = BehaviorState.REST
 
         self.quat_orientation = np.array([1, 0, 0, 0])
 

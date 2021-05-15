@@ -28,7 +28,7 @@ class Command(object):
         self.pitch = 0.0
 
     def __str__(self):
-        s = "-------------------\n"
+        s = "\n-------------------\n"
         s += "horizontal_velocity: %.3f, %.3f\n" % (
             self.horizontal_velocity[0], self.horizontal_velocity[1])
         s += "yaw_rate: %.3f\n" % (self.yaw_rate)

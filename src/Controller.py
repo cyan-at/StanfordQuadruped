@@ -101,10 +101,14 @@ class Controller:
             state.behavior_state = self.hop_transition_mapping[
                 state.behavior_state]
 
+        # print("state", state.behavior_state)
+
         # update cmd_foot_locations
         cmd_foot_locations = None
 
         if state.behavior_state == BehaviorState.TROT:
+            # print("controller trotting")
+
             state.foot_locations, contact_modes = self.step_gait(
                 state,
                 command,
@@ -146,6 +150,7 @@ class Controller:
             cmd_foot_locations = state.foot_locations
 
         elif state.behavior_state == BehaviorState.REST:
+            # print("controller resting")
             yaw_proportion = command.yaw_rate / self.config.max_yaw_rate
             self.smoothed_yaw += (
                 self.config.dt
@@ -180,8 +185,8 @@ class Controller:
             elif command.roll < self.config.min_cmd_roll:
                 command.roll = self.config.min_cmd_roll
 
-            print("controller height %.3f, roll %.3f" % (
-                command.height, command.roll))
+            # print("controller height %.3f, roll %.3f" % (
+            #     command.height, command.roll))
 
             state.foot_locations = (
                 self.config.default_stance

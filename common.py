@@ -373,6 +373,55 @@ class IterateEvent(Event):
       # event_id, iterable_object_key, ed_prefix
     return (int(tokens[0]), blackboard), (tokens[1], tokens[2]) # tuple
 
+class CmdSetEvent(IterateEvent):
+  def dispatch(self, event_dispatch, *args, **kwargs):
+    # set the pupper's cmd
+    # print("updating pupper cmd")
+    # event_dispatch.blackboard[
+    #   args[0]]._cmd = args[2]
+
+    if len(args[2]) > 0:
+      # print("len(args[2])", len(args[2]))
+      event_dispatch.blackboard[
+        args[0]].set_and_iterate(args[2][0],
+          len(args[2]) == 1)
+    # thread-safe write and iterate right away
+    # to force controller
+
+    if len(args[2]) == 1:
+      super(CmdSetEvent, self).dispatch(
+        event_dispatch, *args, **kwargs)
+
+  def finish(self, event_dispatch, *args, **kwargs):
+    # do not self-produce
+    # assume there will be another PupperEvent
+    # to drive the next iterate
+    if self._exception:
+      print("exception caught")
+      return
+
+    if len(args[2]) > 1:
+      iterable_object_key = args[0]
+      ed_prefix = args[1]
+      event_dispatch.blackboard[ed_prefix + "_cv"].acquire()
+      event_dispatch.blackboard[ed_prefix + "_queue"].append(
+        [
+          "CmdSetEvent",
+          self.event_id,
+          iterable_object_key,
+          ed_prefix,
+          args[2][1:]])
+      event_dispatch.blackboard[ed_prefix + "_cv"].notify(1)
+      event_dispatch.blackboard[ed_prefix + "_cv"].release()
+
+  @staticmethod
+  def deserialize(blackboard, *args, **kwargs):
+    tokens = args[0] # args is a tuple of 1 list, that list is tokens
+    if len(tokens) != 4:
+      raise Exception("expected 4 token")
+      # event_id, iterable_object_key, ed_prefix, cmd
+    return (int(tokens[0]), blackboard), (tokens[1], tokens[2], tokens[3]) # tuple
+
 # JQ3uqm
 # An undefined activation, fire-immediately dispatch
 # ################## other ways of activation:
@@ -609,6 +658,7 @@ class BlackboardQueueCVED(EventDispatch):
       # array of [<class>, args]
       if len(s) >= 1:
         # deserialize & dispatch
+        # print("s[0]", s[0])
         try:
           constructor_args, dispatch_args = blackboard[
             s[0]].deserialize(

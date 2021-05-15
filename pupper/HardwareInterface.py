@@ -127,7 +127,9 @@ class HardwareInterface:
                 self.servo_params,
                 joint_angles)
         else:
-            print(joint_angles)
+            # print("joint_angles")
+            # print(joint_angles)
+            pass
     
     def set_actuator_position(self, joint_angle, axis, leg):
         if not self._simulate:

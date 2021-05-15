@@ -36,16 +36,19 @@ from src.State import State
 from pupper.HardwareInterface import HardwareInterface
 from pupper.Config import Configuration
 from pupper.Kinematics import four_legs_inverse_kinematics
+from src.State import BehaviorState, State
 
 # command
 from src.Command import Command
 from src.JoystickInterface import JoystickInterface
 
-from common import IterateEvent
+from common import IterateEvent, CmdSetEvent
 from common import isint, isfloat
 
 from serial_bridge import *
 from gamepad import *
+
+REPEAT_PROXY_FOR_MOVE_DT = 10
 
 class Pupper(IterableObject):
   def __init__(self, simulate = False, activated = False):
@@ -71,6 +74,11 @@ class Pupper(IterableObject):
 
     self._last_t = time.time()
 
+    self._iterate_mutex = Lock()
+    self._iterateevent_mutex = Lock()
+
+    self._debug = 0.0
+
   def do_init(self, *args, **kwargs):
     self.controller.set_pose_to_default(self.state)
     self.hardware_interface.set_actuator_postions(
@@ -81,11 +89,33 @@ class Pupper(IterableObject):
         "expected init with blackboard")
     self._blackboard = args[0]
 
+  def set_and_iterate(self, cmd, exclude_iterate = False):
+    # CmdSetEvent race conditions vs IterateEvent
+    self._iterate_mutex.acquire()
+    self._cmd = cmd
+    # print("set_and_iterate", self._cmd)
+    self._iterate_mutex.release()
+
+    if (exclude_iterate):
+      if not self._iterateevent_mutex.locked():
+        self._iterateevent_mutex.acquire()
+    else:
+      if self._iterateevent_mutex.locked():
+        self._iterateevent_mutex.release()
+
+    self.do_iterate()
+
+    time.sleep(0.1)
+
   def do_iterate(self, *args, **kwargs):
+    # CmdSetEvent race conditions vs IterateEvent
+    self._iterate_mutex.acquire()
+
     cleanup = False
     if self._cmd.activate_event == 1:
       self.activated = not self.activated
       cleanup = True
+      print("Pupper activating", self.activated)
 
     if self.activated:
       now = time.time()
@@ -94,9 +124,29 @@ class Pupper(IterableObject):
         time.sleep(self.config.dt)
         return
 
+      # 2021-05 if commanding horizontal_velocity
+      # put into TROT mode
+      # otherwise, put into REST mode
+      if np.linalg.norm(self._cmd.horizontal_velocity) > 1e-5:
+        self.state.behavior_state = BehaviorState.TROT
+      else:
+        self.state.behavior_state = BehaviorState.REST
+
       self.controller.run(
         self.state,
         self._cmd)
+
+      s = np.sum(self.state.joint_angles)
+
+      s += self._cmd.height
+      s += self._cmd.roll
+      # print(self._cmd)
+
+      if abs(self._debug - s) > 1e-6:
+        # print(self.state.joint_angles)
+        pass
+      self._debug = s
+
       self.hardware_interface.set_actuator_postions(
         self.state.joint_angles)
 
@@ -105,113 +155,14 @@ class Pupper(IterableObject):
     time.sleep(self.config.dt)
 
     if cleanup:
+      print("cleanup activate_event")
       # unset it immediately, do not wait for gamepad
       self._cmd.activate_event = 0
 
+    self._iterate_mutex.release()
+
   def do_cleanup(self):
     pass
-
-class CommandGamepad(Gamepad):
-  def __init__(self):
-    config = Configuration()
-    self.joystick_interface = JoystickInterface(config)
-
-    # joystickinterface expects a state
-    # whereas gamepad captures deltas
-    self._msg = {
-      # discrete between 0 (off) and 1 (on)
-      "R1": 0,
-      "x": 0,
-      "L1": 0,
-
-      # continuous these all go between 0.0 and 1.0
-      "ly": 0.0,
-      "lx": 0.0,
-      "rx": 0.0,
-      "ry": 0.0,
-      "dpady": 0.0,
-      "dpadx": 0.0,
-
-      # other
-      "message_rate": 20, # 20 Hz
-
-      # # unused
-      # "L2": L2,
-      # "R2": R2,
-      # "square": square,
-      # "circle": circle,
-      # "triangle": triangle,
-    }
-
-    self._cmd_target_name = None
-
-    self._iterable_target = None
-
-    super(CommandGamepad, self).__init__()
-
-  def init_external_blackboard(self, *args):
-    # initialize / forward-declare
-    # what pupper_ed needs
-
-    if type(args[0]) is not dict:
-      raise Exception("CommandGamepad expects dict, str, str")
-    if type(args[1]) is not str:
-      raise Exception("CommandGamepad expects dict, str, str")
-    if type(args[2]) is not str:
-      raise Exception("CommandGamepad expects dict, str, str")
-
-    self.external_blackboard = args[0]
-
-    self._cmd_target_name = args[1]
-
-    self._iterable_target = args[2]
-
-    mutex_name = self._cmd_target_name + "_mutex"
-    if mutex_name not in self.external_blackboard:
-      # without creating one explicitly
-      # condition has underlying mutex
-      self.external_blackboard[mutex_name] = Lock()
-
-    cv_name = self._cmd_target_name + "_cv"
-    if cv_name not in self.external_blackboard:
-      self.external_blackboard[cv_name] = Condition(
-        self.external_blackboard[mutex_name])
-
-    queue_name = self._cmd_target_name + "_queue"
-    if queue_name not in self.external_blackboard:
-      self.external_blackboard[queue_name] = []
-
-  def produce(self, k, v):
-    # produce a command to cmd_target if it's something
-    # pupper cares about
-    if (k not in self._msg):
-      return
-
-    self._msg[k] = v
-
-    cmd = self.joystick_interface.build_command(
-      self.external_blackboard[self._iterable_target].state,
-      self._msg)
-    print("cmd", cmd)
-
-    self.external_blackboard[self._cmd_target_name + "_cv"].acquire()
-    self.external_blackboard[self._cmd_target_name + "_queue"].append(
-      [
-        "CmdSetEvent",
-        1,
-        self._iterable_target,
-        self._cmd_target_name,
-        cmd])
-    self.external_blackboard[self._cmd_target_name + "_cv"].notify(1)
-    self.external_blackboard[self._cmd_target_name + "_cv"].release()
-
-  def teardown(self, blackboard):
-    blackboard[self._cmd_target_name + "_cv"].acquire()
-    blackboard[self._cmd_target_name + "_queue"].clear()
-    blackboard[self._cmd_target_name + "_cv"].notify_all()
-    blackboard[self._cmd_target_name + "_cv"].release()
-
-    super(CommandGamepad, self).teardown(blackboard)
 
 class CommandSerialBridge(SerialBridge):
   def __init__(self):
@@ -323,7 +274,7 @@ class CommandSerialBridge(SerialBridge):
       self.external_blackboard[
         self._iterable_target].state,
       self._msg)
-    print(cmd)
+    # print(cmd)
 
     self.external_blackboard[self._cmd_target_name + "_cv"].acquire()
     self.external_blackboard[self._cmd_target_name + "_queue"].append(
@@ -345,10 +296,14 @@ class CommandSerialBridge(SerialBridge):
     super(CommandSerialBridge, self).teardown(blackboard)
 
 class RoboAutoAdapter(object):
-  def __init__(self):
+  def __init__(self, pupper):
     self._h = 0
 
+    self._pupper = pupper
+
   def adapt(self, fin_k, fin_v):
+    fin_v = fin_v[0]
+
     pupper_k = None
     pupper_v = None
     repeat = 1
@@ -371,22 +326,22 @@ class RoboAutoAdapter(object):
     elif fin_v == "Q":
       pupper_k = "rx"
       pupper_v = -0.5
-      repeat = 5
+      repeat = REPEAT_PROXY_FOR_MOVE_DT
     elif fin_v == "q":
       pupper_k = "rx"
       pupper_v = -0.5
-      repeat = 5
+      repeat = REPEAT_PROXY_FOR_MOVE_DT
 
     # height
     elif fin_v == "T":
       pupper_k = "dpady"
       pupper_v = -0.5
-      repeat = 5
+      repeat = REPEAT_PROXY_FOR_MOVE_DT
 
     elif fin_v == "t":
       pupper_k = "dpady"
       pupper_v = -0.5
-      repeat = 5
+      repeat = REPEAT_PROXY_FOR_MOVE_DT
 
     # manual / auto activates
     elif fin_v == "M":
@@ -406,7 +361,7 @@ class RoboAutoAdapter(object):
         self._h = 0
 
       pupper_v = self._h
-      repeat = 5
+      repeat = REPEAT_PROXY_FOR_MOVE_DT
 
     if pupper_k is None:
       return None, None
@@ -414,12 +369,12 @@ class RoboAutoAdapter(object):
     return [pupper_k] * repeat, [pupper_v] * repeat
 
 class AudioAdapter1(object):
-  def __init__(self):
+  def __init__(self, pupper):
     # 5 audiostream events
     # to 'start' a random dance set
     self._moves = {
       # discrete between 0 (off) and 1 (on)
-      "R1": 0, # 1 = trot_event trigger
+      # "R1": 0, # 1 = trot_event trigger
       # "x": 0, # hop_toggle
       # "L1": 0, # 1 = activate_toggle trigger
 
@@ -451,9 +406,13 @@ class AudioAdapter1(object):
     # event in case they arrive too quickly
     self._moves_queue = []
 
+    self._pupper = pupper
+
   def adapt(self, fin_k, fin_v):
-    pupper_k = None
-    pupper_v = None
+    fin_v = fin_v[0]
+
+    pupper_k = []
+    pupper_v = []
     repeat = 1
 
     if fin_k == "audiostream":
@@ -462,10 +421,16 @@ class AudioAdapter1(object):
       if self._audiostream_state == 5:
         # start a dance set
         if self._moves_to_do == 0:
-          self._moves_to_do = random.randint(
-            1, 10)
+          # self._moves_to_do = random.randint(
+          #   1, 10)
+          self._moves_to_do = 1
         print("starting dance set of %d" % (
           self._moves_to_do))
+
+        if not self._pupper.activated:
+          print("activating pupper first")
+          pupper_k.append("L1")
+          pupper_v.append(1)
 
         # if self._last_move not set, set it randomly
         # else, leave it alone
@@ -476,54 +441,73 @@ class AudioAdapter1(object):
           # TODO: this could mean 2
           # consecutive moves that are the same :\
           self._last_move_state = 0
-        # print("\nself._last_move %s" % (self._last_move))
 
-        # with self._last_move is set
-        # we apply a random update, then correct, then null
+          self._last_move = "lx"
+
+        spawn = random.uniform(-1.0, 1.0)
+        print("\nself._last_move %s, %.3f" % (
+          self._last_move, spawn))
+
+        # cycle through all 3 'states' -> <- 0
+        n = 5
         if type(self._moves[self._last_move]) == int:
-          if self._moves[self._last_move] == 0:
-            self._moves[self._last_move] = 1
+          n = 2
+
+        for i in range(n):
+          # with self._last_move is set
+          # we apply a random update, then correct, then null
+          if type(self._moves[self._last_move]) == int:
+            if self._moves[self._last_move] == 0:
+              self._moves[self._last_move] = 1
+            else:
+              self._moves[self._last_move] = 0
           else:
-            self._moves[self._last_move] = 0
-        else:
-          # if abs(self._moves[self._last_move]) < 1e-8:
+            # if abs(self._moves[self._last_move]) < 1e-8:
+            if self._last_move_state == 0:
+              self._moves[self._last_move]\
+                = spawn
+              # print("GOING OUT!")
+            # else:
+            elif self._last_move_state == 1:
+              self._moves[self._last_move] =\
+                -self._moves[self._last_move]
+              # print("CORRECTING")
+            elif self._last_move_state == 4:
+              self._moves[self._last_move] = 0.0
+            elif self._last_move_state == 3:
+              self._moves[self._last_move] =\
+                -self._moves[self._last_move]
+              # print("ZEROING")
+
+          # print("adding", self._last_move,
+          #   self._moves[self._last_move])
+
+          # add to _moves_queue
+          # self._moves_queue.append([
+          #   self._last_move, self._moves[self._last_move]])
+
+          # if len(self._moves_queue) > 0:
+          #   k, v = self._moves_queue.pop(0)
+
+          repeat = REPEAT_PROXY_FOR_MOVE_DT
+          pupper_k += [self._last_move] * repeat
+          pupper_v += [self._moves[self._last_move]] * repeat
+
+          # iterate overhead
+          self._last_move_state = (self._last_move_state + 1) % n
           if self._last_move_state == 0:
-            self._moves[self._last_move]\
-              += random.uniform(-1.0, 1.0)
-            # print("GOING OUT!")
-          # else:
-          elif self._last_move_state == 1:
-            self._moves[self._last_move]\
-              -= 2.0 * self._moves[self._last_move]
-            # print("CORRECTING")
-          elif self._last_move_state == 2:
-            self._moves[self._last_move] = 0.0
-            # print("ZEROING")
-
-        # add to _moves_queue
-        self._moves_queue.append([
-          self._last_move, self._moves[self._last_move]])
-
-        if len(self._moves_queue) > 0:
-          pupper_k, pupper_v = self._moves_queue.pop(0)
-          repeat = 5
-
-        # iterate overhead
-        self._last_move_state = (self._last_move_state + 1) % 3
-        if self._last_move_state == 0:
-          self._last_move = None
+            self._last_move = None
 
         self._moves_to_do -= 1
         if self._moves_to_do == 0:
           self._audiostream_state = 0
 
-    if pupper_k is None:
-      return None, None
+    print("pupper_v", len(pupper_v))
 
-    return [pupper_k] * repeat, [pupper_v] * repeat
+    return pupper_k, pupper_v
 
 class FinSerialBridge(CommandSerialBridge):
-  def __init__(self):
+  def __init__(self, adapters):
     config = Configuration()
     self.joystick_interface = JoystickInterface(config)
 
@@ -556,12 +540,7 @@ class FinSerialBridge(CommandSerialBridge):
 
     self._cmd_target_name = None
 
-    audio_adapter = AudioAdapter1()
-    self.adapters = {
-      "serial" : RoboAutoAdapter(),
-      "audio" : audio_adapter,
-      "audiostream" : audio_adapter,
-    }
+    self.adapters = adapters
 
     super(FinSerialBridge, self).__init__()
 
@@ -569,12 +548,10 @@ class FinSerialBridge(CommandSerialBridge):
     if "," not in data:
       return
 
-    fin_k, fin_v = data.split(",")
+    fin_tokens = data.split(",")
 
-    if isfloat(fin_v):
-      fin_v = float(fin_v)
-      if int(fin_v) == fin_v:
-        fin_v = int(fin_v)
+    fin_k = fin_tokens[0]
+    fin_v = fin_tokens[1:]
 
     pupper_ks = None
     pupper_vs = None
@@ -587,8 +564,12 @@ class FinSerialBridge(CommandSerialBridge):
     if pupper_ks is None or pupper_vs is None:
       return
 
+    cmds = []
     for i, pupper_k in enumerate(pupper_ks):
       pupper_v = pupper_vs[i]
+
+      # print("pupper_k", pupper_k)
+      # print("pupper_v", pupper_v)
 
       if pupper_k == "teardown":
         self.teardown(self.external_blackboard)
@@ -606,22 +587,30 @@ class FinSerialBridge(CommandSerialBridge):
         self.external_blackboard[
           self._iterable_target].state,
         self._msg)
-      print(cmd)
+      # print(cmd)
 
-      self.external_blackboard[
-        self._cmd_target_name + "_cv"].acquire()
-      self.external_blackboard[
-        self._cmd_target_name + "_queue"].append(
-        [
-          "CmdSetEvent",
-          1,
-          self._iterable_target,
-          self._cmd_target_name,
-          cmd])
-      self.external_blackboard[
-        self._cmd_target_name + "_cv"].notify(1)
-      self.external_blackboard[
-        self._cmd_target_name + "_cv"].release()
+      cmds.append(cmd)
+
+    # bulk produce, notify once
+    # let IterateEvent do the rest
+    self.external_blackboard[
+      self._cmd_target_name + "_cv"].acquire()
+
+    self.external_blackboard[
+      self._cmd_target_name + "_queue"].append(
+      [
+        "CmdSetEvent",
+        1,
+        self._iterable_target,
+        self._cmd_target_name,
+        cmds])
+
+    # actually since eeach cmdSetevent spawns a thread
+    # ordering is not guaranteed so just iterate above
+    self.external_blackboard[
+      self._cmd_target_name + "_cv"].notify(1)
+    self.external_blackboard[
+      self._cmd_target_name + "_cv"].release()
 
 class SimulatedFinSerialBridge(FinSerialBridge):
   def do_init(self, *args, **kwargs):
@@ -642,7 +631,7 @@ class SimulatedFinSerialBridge(FinSerialBridge):
       "audiostream" : ["1"]
     }
 
-    self._random_interval = 3.0
+    self._random_interval = 1.0
     self._queued_simulated_read_data = "serial,M"
     # load up activating pupper
 
@@ -664,40 +653,14 @@ class SimulatedFinSerialBridge(FinSerialBridge):
 
     time.sleep(self._random_interval)
     self.produce(self._queued_simulated_read_data)
-
+ 
     self._queued_simulated_read_data = "audiostream,1"
     # random_next = random.randint(0, len(
     #   self._simulate_data["serial"])-1)
     # self._queued_simulated_read_data = "serial," +\
     #   self._simulate_data["serial"][random_next]
 
-    self._random_interval = random.uniform(0.0, 2.0)
-
-class CmdSetEvent(IterateEvent):
-  def dispatch(self, event_dispatch, *args, **kwargs):
-    # set the pupper's cmd
-    # print("updating pupper cmd")
-    event_dispatch.blackboard[
-      args[0]]._cmd = args[2]
-
-    super(CmdSetEvent, self).dispatch(
-      event_dispatch, *args, **kwargs)
-
-  def finish(self, event_dispatch, *args, **kwargs):
-    # do not self-produce
-    # assume there will be another PupperEvent
-    # to drive the next iterate
-    if self._exception:
-      print("exception caught")
-      return
-
-  @staticmethod
-  def deserialize(blackboard, *args, **kwargs):
-    tokens = args[0] # args is a tuple of 1 list, that list is tokens
-    if len(tokens) != 4:
-      raise Exception("expected 4 token")
-      # event_id, iterable_object_key, ed_prefix, cmd
-    return (int(tokens[0]), blackboard), (tokens[1], tokens[2], tokens[3]) # tuple
+    self._random_interval = random.uniform(1.0, 2.0)
 
 if __name__ == "__main__":
   from common import bcolors, nonempty_queue_exists
@@ -755,8 +718,19 @@ if __name__ == "__main__":
   #   blackboard["gamepad_cv"].notify(1)
   #   blackboard["gamepad_cv"].release()
 
+  pupper = Pupper(
+    args.simulate > 0)
+  pupper.init(blackboard)
+
   if len(args.serial) > 0:
-    sb = CommandSerialBridge()
+    audio_adapter = AudioAdapter1(pupper)
+    adapters = {
+      "serial" : RoboAutoAdapter(pupper),
+      "audio" : audio_adapter,
+      "audiostream" : audio_adapter,
+    }
+
+    sb = FinSerialBridge(adapters)
     sb.init(
       args.serial,
       args.baudrate,
@@ -765,7 +739,7 @@ if __name__ == "__main__":
       "pupper_iterable")
     if not sb.initialized():
       print("no sb, running SimulatedFinSerialBridge")
-      sb = SimulatedFinSerialBridge()
+      sb = SimulatedFinSerialBridge(adapters)
       sb.init(
         args.serial,
         args.baudrate,
@@ -773,7 +747,7 @@ if __name__ == "__main__":
         "pupper",
         "pupper_iterable")
 
-      blackboard["sb_iterable"] = sb
+    blackboard["sb_iterable"] = sb
 
     # dispatch, actor consumes / produces
     sb_ed = BlackboardQueueCVED(
@@ -793,9 +767,6 @@ if __name__ == "__main__":
     blackboard["sb_cv"].notify(1)
     blackboard["sb_cv"].release()
 
-  pupper = Pupper(
-    args.simulate > 0)
-  pupper.init(blackboard)
   if not pupper.initialized():
     print("couldn't initialize pupper")
     sys.exit(1)
