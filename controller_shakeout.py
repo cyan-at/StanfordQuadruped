@@ -144,6 +144,7 @@ class Pupper(IterableObject):
 
       if abs(self._debug - s) > 1e-6:
         # print(self.state.joint_angles)
+        print(".", end='')
         pass
       self._debug = s
 
@@ -408,6 +409,8 @@ class AudioAdapter1(object):
 
     self._pupper = pupper
 
+    self._global_block = False
+
   def adapt(self, fin_k, fin_v):
     fin_v = fin_v[0]
 
@@ -416,6 +419,9 @@ class AudioAdapter1(object):
     repeat = 1
 
     if fin_k == "audiostream":
+      if self._global_block:
+        return
+
       if self._audiostream_state < 5:
         self._audiostream_state += 1
       if self._audiostream_state == 5:
@@ -501,8 +507,11 @@ class AudioAdapter1(object):
         self._moves_to_do -= 1
         if self._moves_to_do == 0:
           self._audiostream_state = 0
+    elif fin_k == "audio,3":
+      print("toggle _global_block")
+      self._global_block == not self._global_block
 
-    print("pupper_v", len(pupper_v))
+    print("\npupper_v", len(pupper_v))
 
     return pupper_k, pupper_v
 
