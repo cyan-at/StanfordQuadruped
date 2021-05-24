@@ -509,7 +509,7 @@ class AudioAdapter1(object):
           self._audiostream_state = 0
     elif fin_k == "audio,3":
       print("toggle _global_block")
-      self._global_block == not self._global_block
+      self._global_block = not self._global_block
 
     print("\npupper_v", len(pupper_v))
 
