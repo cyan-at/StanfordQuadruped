@@ -420,7 +420,8 @@ class AudioAdapter1(object):
 
     if fin_k == "audiostream":
       if self._global_block:
-        return
+        print("self._global_block")
+        return pupper_k, pupper_v
 
       if self._audiostream_state < 5:
         self._audiostream_state += 1
@@ -505,9 +506,12 @@ class AudioAdapter1(object):
             self._last_move = None
 
         self._moves_to_do -= 1
+        print("self._moves_to_do", self._moves_to_do)
+
         if self._moves_to_do == 0:
+          print("resetting _audiostream_state")
           self._audiostream_state = 0
-    elif fin_k == "audio,3":
+    elif fin_k == "audio" and fin_v == "3":
       print("toggle _global_block")
       self._global_block = not self._global_block
 
@@ -556,6 +560,7 @@ class FinSerialBridge(CommandSerialBridge):
   def produce(self, data):
     if "," not in data:
       return
+    # print("data", data)
 
     fin_tokens = data.split(",")
 
