@@ -86,20 +86,35 @@ class Controller:
             Robot controller object.
         """
 
+
+        # 2021-05 if commanding horizontal_velocity
+        # put into TROT mode
+        # otherwise, put into REST mod
+        if np.linalg.norm(command.horizontal_velocity) > 1e-5 and state.behavior_state == BehaviorState.REST:
+          print("horizontal_velocity", command.horizontal_velocity)
+          state.behavior_state = BehaviorState.TROT
+        # else:
+        #   state.behavior_state = BehaviorState.REST
+
         ########## Update operating state based on command ######
         ########## State machines grrrrr :( ######
         if command.activate_event and\
             state.behavior_state in self.activate_transition_mapping:
             state.behavior_state = self.activate_transition_mapping[
                 state.behavior_state]
+            command.activate_event = not command.activate_event
         elif command.trot_event and\
             state.behavior_state in self.trot_transition_mapping:
             state.behavior_state = self.trot_transition_mapping[
                 state.behavior_state]
+            command.trot_event = not command.trot_event
+            if state.behavior_state == BehaviorState.REST:
+              command.horizontal_velocity = np.array([0, 0])
         elif command.hop_event and\
             state.behavior_state in self.hop_transition_mapping:
             state.behavior_state = self.hop_transition_mapping[
                 state.behavior_state]
+            command.hop_event = not command.hop_event
 
         # print("state", state.behavior_state)
 

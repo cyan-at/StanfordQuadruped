@@ -43,7 +43,7 @@ from src.Command import Command
 from src.JoystickInterface import JoystickInterface
 
 from common import IterateEvent, CmdSetEvent
-from common import isint, isfloat
+from common import isint, isfloat, RLock
 
 from serial_bridge import *
 from gamepad import *
@@ -65,16 +65,14 @@ class Pupper(IterableObject):
         four_legs_inverse_kinematics,
     )
     self.state = State()
-
-    self.activated = activated
     if activated:
-      self._cmd.activate_event = 1
+      self.state.behavior_state = BehaviorState.REST
 
     self._cmd = Command()
 
     self._last_t = time.time()
 
-    self._iterate_mutex = Lock()
+    self._iterate_mutex = RLock()
     self._iterateevent_mutex = Lock()
 
     self._debug = 0.0
@@ -89,81 +87,54 @@ class Pupper(IterableObject):
         "expected init with blackboard")
     self._blackboard = args[0]
 
-  def set_and_iterate(self, cmd, exclude_iterate = False):
-    # CmdSetEvent race conditions vs IterateEvent
-    self._iterate_mutex.acquire()
-    self._cmd = cmd
-    # print("set_and_iterate", self._cmd)
-    self._iterate_mutex.release()
-
-    if (exclude_iterate):
-      if not self._iterateevent_mutex.locked():
-        self._iterateevent_mutex.acquire()
-    else:
-      if self._iterateevent_mutex.locked():
-        self._iterateevent_mutex.release()
-
-    self.do_iterate()
-
-    time.sleep(0.1)
-
   def do_iterate(self, *args, **kwargs):
     # CmdSetEvent race conditions vs IterateEvent
-    self._iterate_mutex.acquire()
-
-    cleanup = False
-    if self._cmd.activate_event == 1:
-      self.activated = not self.activated
-      cleanup = True
-      print("Pupper activating", self.activated)
-
-    if self.activated:
-      now = time.time()
-      if now - self._last_t < self.config.dt:
-        # print("too soon", now - self._last_t)
-        time.sleep(self.config.dt)
-        return
-
-      # 2021-05 if commanding horizontal_velocity
-      # put into TROT mode
-      # otherwise, put into REST mode
-      if np.linalg.norm(self._cmd.horizontal_velocity) > 1e-5:
-        self.state.behavior_state = BehaviorState.TROT
-      else:
-        self.state.behavior_state = BehaviorState.REST
-
+    with self._iterate_mutex:
+      # state update
       self.controller.run(
         self.state,
         self._cmd)
 
-      s = np.sum(self.state.joint_angles)
+      if self.state.behavior_state == BehaviorState.DEACTIVATED:
+        raise Exception(
+          "not activated, another command will start iterating")
+      elif self.state.behavior_state == BehaviorState.REST:
+        raise Exception(
+          "resting, another command will start iterating")
+      else:
+        # print(self.state.behavior_state)
 
-      s += self._cmd.height
-      s += self._cmd.roll
-      # print(self._cmd)
+        now = time.time()
+        if now - self._last_t < self.config.dt:
+          time.sleep(self.config.dt)
+          return
 
-      if abs(self._debug - s) > 1e-6:
-        # print(self.state.joint_angles)
-        print(".", end='')
-        pass
-      self._debug = s
+        self.hardware_interface.set_actuator_postions(
+          self.state.joint_angles)
+        self._last_t = time.time()
 
-      self.hardware_interface.set_actuator_postions(
-        self.state.joint_angles)
+        s = np.sum(self.state.joint_angles)
+        s += self._cmd.height
+        s += self._cmd.roll
+        # print(self._cmd)
+        if abs(self._debug - s) > 1e-6:
+          print(self.state.joint_angles)
+          # print("s.", end='')
+          pass
+        self._debug = s
 
-      self._last_t = time.time()
-
-    time.sleep(self.config.dt)
-
-    if cleanup:
-      print("cleanup activate_event")
-      # unset it immediately, do not wait for gamepad
-      self._cmd.activate_event = 0
-
-    self._iterate_mutex.release()
+      time.sleep(self.config.dt)
 
   def do_cleanup(self):
     pass
+
+  def set_and_iterate(self, cmd):
+    # CmdSetEvent race conditions vs IterateEvent
+    with self._iterate_mutex:
+      print("setting self._cmd")
+      self._cmd = cmd
+
+      self.do_iterate()
 
 class CommandSerialBridge(SerialBridge):
   def __init__(self):
@@ -362,7 +333,6 @@ class RoboAutoAdapter(object):
         self._h = 0
 
       pupper_v = self._h
-      repeat = REPEAT_PROXY_FOR_MOVE_DT
 
     if pupper_k is None:
       return None, None
@@ -601,7 +571,7 @@ class FinSerialBridge(CommandSerialBridge):
         self.external_blackboard[
           self._iterable_target].state,
         self._msg)
-      # print(cmd)
+      print(cmd)
 
       cmds.append(cmd)
 
@@ -631,50 +601,20 @@ class SimulatedFinSerialBridge(FinSerialBridge):
     self.external_blackboard = None
     self.init_external_blackboard(*args)
 
-    self._simulate_data = {
-      "serial" : [
-        "F",
-        "B",
-        "L",
-        "R",
-        "H",
-        "T",
-        "t",
-        "Q",
-        "q"],
-      "audiostream" : ["1"]
-    }
-
-    self._random_interval = 1.0
+    self._random_interval = 5.0
     self._queued_simulated_read_data = "serial,M"
     # load up activating pupper
+    # 5 seconds after first iterate, put pupper into trot
 
   def do_iterate(self, *args, **kwargs):
-    if len(self._blackboard["tx_buffer"]) > 0:
-      self._serial_handle.write(
-        str.encode(self._blackboard["tx_buffer"]))
-      self._blackboard["tx_buffer"] = ""
-
-    '''
-    read_data = self._serial_handle.readline()
-    read_data = read_data.decode('ascii').rstrip('\r\n')
-
-    if len(read_data) > 0:
-      if read_data == "end":
-        self.teardown(args[0].blackboard)
-        return
-    '''
-
     time.sleep(self._random_interval)
     self.produce(self._queued_simulated_read_data)
- 
-    self._queued_simulated_read_data = "audiostream,1"
-    # random_next = random.randint(0, len(
-    #   self._simulate_data["serial"])-1)
-    # self._queued_simulated_read_data = "serial," +\
-    #   self._simulate_data["serial"][random_next]
 
-    self._random_interval = random.uniform(1.0, 2.0)
+    time.sleep(self._random_interval)
+    self._queued_simulated_read_data = "serial,H"
+    self.produce(self._queued_simulated_read_data)
+
+    raise Exception("stop iterating")
 
 if __name__ == "__main__":
   from common import bcolors, nonempty_queue_exists
@@ -705,33 +645,6 @@ if __name__ == "__main__":
   blackboard["done_mutex"] = Lock()
   blackboard["done_queue"] = [1]
 
-  ############### actors
-  # gamepad = CommandGamepad()
-  # gamepad.init(blackboard, "pupper", "pupper_iterable")
-  # if not gamepad.initialized():
-  #   print("couldn't initialize gamepad")
-  #   # sys.exit(1)
-  # else:
-  #   blackboard["gamepad_iterable"] = gamepad
-
-  #   # dispatch, actor consumes / produces
-  #   gamepad_ed = BlackboardQueueCVED(
-  #     blackboard, "gamepad")
-  #   blackboard["gamepad_thread"] = Thread(
-  #     target=gamepad_ed.run,
-  #     args=(blackboard,
-  #       "gamepad",
-  #       # "done",
-  #       None,
-  #       bcolors.HEADER))
-
-  #   ############### actor context setup
-  #   blackboard["gamepad_cv"].acquire()
-  #   blackboard["gamepad_queue"].append(
-  #     ["IterateEvent", 1, "gamepad_iterable", "gamepad"])
-  #   blackboard["gamepad_cv"].notify(1)
-  #   blackboard["gamepad_cv"].release()
-
   pupper = Pupper(
     args.simulate > 0)
   pupper.init(blackboard)
@@ -740,8 +653,8 @@ if __name__ == "__main__":
     audio_adapter = AudioAdapter1(pupper)
     adapters = {
       "serial" : RoboAutoAdapter(pupper),
-      "audio" : audio_adapter,
-      "audiostream" : audio_adapter,
+      # "audio" : audio_adapter,
+      # "audiostream" : audio_adapter,
     }
 
     sb = FinSerialBridge(adapters)
@@ -762,7 +675,6 @@ if __name__ == "__main__":
         "pupper_iterable")
 
     blackboard["sb_iterable"] = sb
-
     # dispatch, actor consumes / produces
     sb_ed = BlackboardQueueCVED(
       blackboard, "sb")
@@ -803,24 +715,6 @@ if __name__ == "__main__":
     ["IterateEvent", 1, "pupper_iterable", "pupper"])
   blackboard["pupper_cv"].notify(1)
   blackboard["pupper_cv"].release()
-
-  ############### dispatches
-  # gamepad_ed = BlackboardQueueCVED(
-  #   blackboard, "gamepad")
-  # blackboard["gamepad_thread"] = Thread(
-  #   target=gamepad_ed.run,
-  #   args=(blackboard,
-  #     "gamepad",
-  #     # "done",
-  #     None,
-  #     bcolors.CYAN))
-
-  ############### actor context setup
-  # blackboard["gamepad_cv"].acquire()
-  # blackboard["gamepad_queue"].append(
-  #   ["IterateEvent", 1, "gamepad", "gamepad"])
-  # blackboard["gamepad_cv"].notify(1)
-  # blackboard["gamepad_cv"].release()
 
   ############### events
   blackboard["IterateEvent"] = IterateEvent
