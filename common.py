@@ -330,9 +330,9 @@ class IterateEvent(Event):
       event_dispatch.blackboard[
         iterable_object_key].iterate(event_dispatch, self)
     except Exception as e:
-      print(e)
-      track = traceback.format_exc()
-      print(track)
+      # print(e)
+      # track = traceback.format_exc()
+      # print(track)
       self._exception = True
 
     # print("done IterateEvent on %s" % (iterable_object_key))
@@ -384,13 +384,13 @@ class CmdSetEvent(IterateEvent):
     # event_dispatch.blackboard[
     #   args[0]]._cmd = args[2]
 
-    print("CmdSetEvent")
+    # print("CmdSetEvent on %s" % (args[0]))
     if len(args[2]) > 0:
-      print("len(args[2])", len(args[2]))
+      # print("len(args[2])", len(args[2]))
       event_dispatch.blackboard[
-        args[0]].set_and_iterate(args[2][0])
-    # thread-safe write and iterate right away
-    # to force controller
+        args[0]].set_and_iterate(args[2][0], event_dispatch, self)
+      # thread-safe write and iterate right away
+      # to force controller
 
   def finish(self, event_dispatch, *args, **kwargs):
     # do not self-produce
@@ -403,7 +403,10 @@ class CmdSetEvent(IterateEvent):
     iterable_object_key = args[0]
     ed_prefix = args[1]
 
-    if len(args[2]) >= 1:
+    args[2].pop()
+    # print("len(args[2])", args[2])
+
+    if len(args[2]) > 0:
       event_dispatch.blackboard[ed_prefix + "_cv"].acquire()
       event_dispatch.blackboard[ed_prefix + "_queue"].append(
         [
@@ -411,10 +414,13 @@ class CmdSetEvent(IterateEvent):
           self.event_id,
           iterable_object_key,
           ed_prefix,
-          args[2][1:]])
+          args[2]])
       event_dispatch.blackboard[ed_prefix + "_cv"].notify(1)
       event_dispatch.blackboard[ed_prefix + "_cv"].release()
     elif len(args[2]) == 0:
+      event_dispatch.blackboard[
+        args[0]].handle_lastcmdset(None, event_dispatch, self)
+
       event_dispatch.blackboard[ed_prefix + "_cv"].acquire()
       event_dispatch.blackboard[ed_prefix + "_queue"].append(
         [

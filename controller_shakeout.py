@@ -73,7 +73,9 @@ class Pupper(IterableObject):
     self._last_t = time.time()
 
     self._iterate_mutex = RLock()
-    self._iterateevent_mutex = Lock()
+
+    self._cmdset_mutex = Lock()
+    self._cmdset_counter = 0
 
     self._debug = 0.0
 
@@ -88,12 +90,28 @@ class Pupper(IterableObject):
     self._blackboard = args[0]
 
   def do_iterate(self, *args, **kwargs):
+    if args[1].__class__.__name__ == "IterateEvent":
+      with self._cmdset_mutex:
+        if self._cmdset_counter > 0:
+          # raise Exception("yielding")
+
+          # print("yielding")
+          self._cmdset_counter -= 1
+          return
+
     # CmdSetEvent race conditions vs IterateEvent
     with self._iterate_mutex:
       # state update
       self.controller.run(
         self.state,
         self._cmd)
+
+      if args[1].__class__.__name__ == "IterateEvent":
+        self._cmd.horizontal_velocity = self._cmd.horizontal_velocity * 0.9
+        # complementary filter it down to asym. 0
+        # semantics: eventually come to a stop if not explicitly
+        # held high
+      # print(self._cmd.horizontal_velocity)
 
       if self.state.behavior_state == BehaviorState.DEACTIVATED:
         raise Exception(
@@ -118,7 +136,8 @@ class Pupper(IterableObject):
         s += self._cmd.roll
         # print(self._cmd)
         if abs(self._debug - s) > 1e-6:
-          print(self.state.joint_angles)
+          # print(self.state.joint_angles)
+          # print("")
           # print("s.", end='')
           pass
         self._debug = s
@@ -128,13 +147,24 @@ class Pupper(IterableObject):
   def do_cleanup(self):
     pass
 
-  def set_and_iterate(self, cmd):
-    # CmdSetEvent race conditions vs IterateEvent
-    with self._iterate_mutex:
-      print("setting self._cmd")
-      self._cmd = cmd
+  def set_and_iterate(self, cmd, ed, e):
+    with self._cmdset_mutex:
+      if self._cmdset_counter == 0:
+        self._cmdset_counter = 20
 
-      self.do_iterate()
+      # CmdSetEvent race conditions vs IterateEvent
+      with self._iterate_mutex:
+        # print("setting self._cmd")
+        self._cmd = cmd
+
+        self.do_iterate(ed, e)
+
+  def handle_lastcmdset(self, cmd, ed, e):
+    # with self._cmdset_mutex:
+    #   if self._cmdset_counter > 0:
+    #     self._cmdset_counter = 0
+    # print("last one")
+    pass
 
 class CommandSerialBridge(SerialBridge):
   def __init__(self):
@@ -281,17 +311,17 @@ class RoboAutoAdapter(object):
     repeat = 1
 
     if fin_v == "F":
-      pupper_k = "ly"
+      pupper_k = "lx"
       pupper_v = 0.5
     elif fin_v == "B":
-      pupper_k = "ly"
+      pupper_k = "lx"
       pupper_v = -0.5
 
     elif fin_v == "L":
-      pupper_k = "lx"
+      pupper_k = "ly"
       pupper_v = 0.5
     elif fin_v == "R":
-      pupper_k = "lx"
+      pupper_k = "ly"
       pupper_v = -0.5
 
     # yaw rate
@@ -565,13 +595,23 @@ class FinSerialBridge(CommandSerialBridge):
         print("k not found", pupper_k)
         continue
 
+      # always only move in the max singular direction
+      self._msg["lx"] = 0.0
+      self._msg["ly"] = 0.0
+
       self._msg[pupper_k] = pupper_v
 
       cmd = self.joystick_interface.build_command(
         self.external_blackboard[
           self._iterable_target].state,
         self._msg)
-      print(cmd)
+      # print(cmd)
+
+      # always only move in the max singular direction
+      if cmd.horizontal_velocity[0] > cmd.horizontal_velocity[1]:
+        cmd.horizontal_velocity[1] = 0.0
+      else:
+        cmd.horizontal_velocity[0] = 0.0
 
       cmds.append(cmd)
 
